@@ -36,10 +36,8 @@ export function BulkUpload() {
     });
   };
 
-  const handleFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
+  const processFiles = async (files: File[]) => {
+    if (files.length === 0) return;
     setIsUploading(true);
     setProgress({ current: 0, total: files.length });
 
@@ -56,39 +54,17 @@ export function BulkUpload() {
 
         await db.transaction('rw', db.items, db.photos, async () => {
           const newItem: Item = {
-            id: itemId,
-            type: 'unknown',
-            slot: 'top',
-            label: cleanName,
+            id: itemId, type: 'unknown', slot: 'top', label: cleanName,
             color: { family: 'black', hex: '#000000', label: 'Черный' },
-            pattern: 'solid',
-            texture: 'cotton',
-            warmth: 3,
-            tempMin: 5,
-            tempMax: 20,
-            waterResistance: 0,
-            windproof: false,
-            formality: 2,
-            occasions: ['walk', 'home'],
-            tags: [],
-            status: 'available',
-            favorite: false,
-            photoId: photoId,
-            wearCount: 0,
-            source: 'import',
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
+            pattern: 'solid', texture: 'cotton', warmth: 3, tempMin: 5, tempMax: 20,
+            waterResistance: 0, windproof: false, formality: 2, occasions: ['walk', 'home'],
+            tags: [], status: 'available', favorite: false, photoId: photoId,
+            wearCount: 0, source: 'import', createdAt: Date.now(), updatedAt: Date.now(),
           };
 
           const newPhoto: Photo = {
-            id: photoId,
-            itemId: itemId,
-            main: mainBlob,
-            thumb: thumbBlob,
-            mime: 'image/png',
-            width: 1000,
-            height: 1000,
-            bytes: file.size,
+            id: photoId, itemId: itemId, main: mainBlob, thumb: thumbBlob,
+            mime: 'image/png', width: 1000, height: 1000, bytes: file.size,
             createdAt: Date.now()
           };
 
@@ -104,6 +80,22 @@ export function BulkUpload() {
 
     setIsUploading(false);
     alert('Все фото успешно загружены в базу!');
+  };
+
+  // Обычный выбор файлов (на всякий случай)
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files) void processFiles(Array.from(files));
+    e.target.value = '';
+  };
+
+  // Выбор целой папки (работает в Chrome/Edge)
+  const handleFolderInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files) {
+      const imageFiles = Array.from(files).filter(f => f.type === 'image/png');
+      void processFiles(imageFiles);
+    }
     e.target.value = '';
   };
 
@@ -112,10 +104,33 @@ export function BulkUpload() {
       <h3 className="text-white font-bold mb-2">Пакетная загрузка вещей (PNG)</h3>
       
       {!isUploading ? (
-        <label className="cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg inline-block transition-colors">
-          Выбрать файлы
-          <input type="file" multiple accept="image/png" className="hidden" onChange={handleFiles} />
-        </label>
+        <div className="flex flex-col gap-3">
+          <label className="cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-3 rounded-lg text-center transition-colors font-medium">
+            📁 Загрузить целую папку
+            <input 
+              type="file" 
+              // @ts-ignore
+              webkitdirectory="true"
+              multiple 
+              accept="image/png" 
+              className="hidden" 
+              onChange={handleFolderInput} 
+            />
+          </label>
+          
+          <div className="text-center text-slate-400 text-sm">или</div>
+
+          <label className="cursor-pointer bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg text-center transition-colors">
+            Выбрать отдельные файлы
+            <input 
+              type="file" 
+              multiple 
+              accept="image/png" 
+              className="hidden" 
+              onChange={handleFileInput} 
+            />
+          </label>
+        </div>
       ) : (
         <div className="text-white">
           Загрузка: {progress.current} из {progress.total}...
