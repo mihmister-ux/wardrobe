@@ -2,13 +2,12 @@
 
 import { LayoutGrid } from "lucide-react";
 
+import { PageHeader } from "@/components/layout/PageHeader";
+
 export default function OutfitsPage() {
   return (
     <>
-      <header className="mb-5">
-        <p className="text-xs text-muted-foreground">История и подборки</p>
-        <h1 className="text-xl font-semibold tracking-tight">Образы</h1>
-      </header>
+      <PageHeader eyebrow="История и подборки" title="Образы" />
 
       <main className="space-y-6">
         <section className="rounded-3xl border border-dashed border-border bg-card/60 px-6 py-9 text-center">

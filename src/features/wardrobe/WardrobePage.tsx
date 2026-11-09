@@ -2,6 +2,7 @@
 
 import { Plus, Shirt } from "lucide-react";
 
+import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 
 export interface WardrobePageProps {
@@ -11,10 +12,7 @@ export interface WardrobePageProps {
 export default function WardrobePage({ onAddItem }: WardrobePageProps) {
   return (
     <>
-      <header className="mb-5">
-        <p className="text-xs text-muted-foreground">Все вещи</p>
-        <h1 className="text-xl font-semibold tracking-tight">Гардероб</h1>
-      </header>
+      <PageHeader eyebrow="Все вещи" title="Гардероб" />
 
       <main className="space-y-6">
         <section className="rounded-3xl border border-dashed border-border bg-card/60 px-6 py-9 text-center">

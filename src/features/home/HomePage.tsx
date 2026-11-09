@@ -1,9 +1,9 @@
- "use client";
+"use client";
 
 import * as React from "react";
+import { Link } from "react-router-dom";
 import {
-  ChevronLeft,
-  ChevronRight,
+  ArrowRight,
   Cloud,
   CloudRain,
   CloudSun,
@@ -19,11 +19,15 @@ import {
   Wind,
 } from "lucide-react";
 
+import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useUserName } from "@/features/settings/useUserName";
+import { Reveal } from "@/components/ui/reveal";
+import type { Item } from "@/db/types";
+import { formatItemRange, itemName, SLOT_EMOJI } from "@/features/home/buildOutfits";
 import { useHomeOutfits } from "@/features/home/useHomeOutfits";
 import { useWeather } from "@/features/home/useWeather";
+import { useUserName } from "@/features/settings/useUserName";
 import { cn } from "@/lib/utils";
 
 /* ========================================================================== */
@@ -56,7 +60,12 @@ export interface OutfitItem {
 export interface Outfit {
   id: string;
   title: string;
+  /** Пояснение под заголовком: чем хорош образ. */
   note: string;
+  /** Короткая подпись правила сочетаемости («Монохромный образ»). */
+  harmony: string;
+  /** HEX цветов образа — точки палитры. */
+  palette: string[];
   score: number;
   tags: string[];
   items: OutfitItem[];
@@ -124,11 +133,11 @@ function SectionHeader({
   return (
     <div className="flex items-end justify-between gap-3">
       <div>
-        <h2 className="flex items-center gap-1.5 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           <Icon className="size-4" />
           {title}
         </h2>
-        {hint ? <p className="mt-0.5 text-xs text-muted-foreground/80">{hint}</p> : null}
+        {hint ? <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p> : null}
       </div>
       {action}
     </div>
@@ -233,7 +242,7 @@ function WeatherCard({ weather, isFallback = false }: { weather: Weather; isFall
       <div className="space-y-1 border-t border-border/60 bg-muted/40 px-4 py-2.5 text-xs text-muted-foreground">
         <p>{weatherHint(weather)}</p>
         {isFallback ? (
-          <p className="text-[11px] text-muted-foreground/70">
+          <p className="text-xs">
             Показана погода по умолчанию: разрешите геолокацию, чтобы видеть свою.
           </p>
         ) : null}
@@ -299,6 +308,22 @@ function OutfitOfTheDay({
           <div className="space-y-1">
             <h3 className="text-base font-semibold leading-tight">{outfit.title}</h3>
             <p className="text-sm text-muted-foreground">{outfit.note}</p>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+              <Sparkles className="size-3.5" />
+              {outfit.harmony}
+            </span>
+            <span className="flex items-center gap-1" aria-label="Палитра образа">
+              {outfit.palette.map((hex) => (
+                <span
+                  key={hex}
+                  className="size-4 rounded-full border border-border"
+                  style={{ backgroundColor: hex }}
+                />
+              ))}
+            </span>
           </div>
 
           <div className="flex flex-wrap gap-1.5">
@@ -392,119 +417,107 @@ function EmptyOutfit({ onAddItem }: { onAddItem?: () => void }) {
 }
 
 /* ========================================================================== */
-/*  3. Карусель альтернатив                                                   */
+/*  3. Альтернативы (правая колонка)                                          */
 /* ========================================================================== */
 
-function AlternativesCarousel({
-  outfits,
-  onOpen,
-}: {
-  outfits: Outfit[];
-  onOpen?: (outfit: Outfit) => void;
-}) {
-  const railRef = React.useRef<HTMLDivElement>(null);
-
-  const scrollByCards = (direction: 1 | -1) => {
-    const rail = railRef.current;
-    if (!rail) return;
-    rail.scrollBy({
-      left: direction * Math.min(rail.clientWidth * 0.8, 340),
-      behavior: "smooth",
-    });
-  };
-
-  if (outfits.length === 0) return null;
-
+function AlternativesStub() {
   return (
     <section className="space-y-3">
-      <SectionHeader
-        icon={LayoutGrid}
-        title="Ещё варианты"
-        hint={`${outfits.length} образа из вашего гардероба`}
-        action={
-          <div className="flex gap-1">
-            <Button
-              variant="outline"
-              size="icon"
-              className="size-8 rounded-full"
-              aria-label="Пролистать назад"
-              onClick={() => scrollByCards(-1)}
-            >
-              <ChevronLeft className="size-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="size-8 rounded-full"
-              aria-label="Пролистать вперёд"
-              onClick={() => scrollByCards(1)}
-            >
-              <ChevronRight className="size-4" />
-            </Button>
-          </div>
-        }
-      />
+      <SectionHeader icon={LayoutGrid} title="Альтернативы" hint="Несколько образов на выбор" />
 
-      <div
-        ref={railRef}
-        className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      >
-        {outfits.map((outfit) => (
-          <button
-            key={outfit.id}
-            type="button"
-            onClick={() => onOpen?.(outfit)}
-            className="group w-[164px] shrink-0 snap-start overflow-hidden rounded-2xl border border-border/60 bg-card text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
+      <div className="rounded-3xl border border-dashed border-border bg-card/60 p-3">
+        <div className="grid grid-cols-3 gap-2">
+          {["🌤", "🍂", "🌙"].map((emoji) => (
             <div
-              className={cn(
-                "relative grid aspect-square place-items-center bg-gradient-to-br",
-                outfit.gradient,
-              )}
+              key={emoji}
+              className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-gradient-to-br from-muted to-secondary/70"
             >
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.55),transparent_60%)]" />
-              <div className="relative flex gap-1 text-2xl">
-                {outfit.items.slice(0, 3).map((item) => (
-                  <span key={item.id} aria-hidden>
-                    {item.emoji}
-                  </span>
-                ))}
-              </div>
-              <span className="absolute right-2 top-2 rounded-full bg-white/65 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-slate-900">
-                {outfit.score}%
+              <span
+                aria-hidden
+                className="absolute inset-0 grid place-items-center text-2xl opacity-25 blur-[1.5px]"
+              >
+                {emoji}
               </span>
             </div>
-            <div className="space-y-1 p-2.5">
-              <p className="line-clamp-1 text-xs font-medium">{outfit.title}</p>
-              <p className="line-clamp-1 text-[11px] text-muted-foreground">
-                {outfit.tags.join(" · ")}
-              </p>
-            </div>
-          </button>
-        ))}
+          ))}
+        </div>
+
+        <p className="mt-3 text-xs leading-snug text-muted-foreground">
+          Скоро здесь будет 3–5 вариантов на день. Пока показываем лучший образ.
+        </p>
       </div>
     </section>
   );
 }
 
 /* ========================================================================== */
-/*  4. Кнопка «+»                                                             */
+/*  4. Список вещей (правая колонка)                                          */
 /* ========================================================================== */
 
-function AddItemFab({ onClick }: { onClick?: () => void }) {
+function WardrobePreview({ items, onAddItem }: { items: Item[]; onAddItem?: () => void }) {
+  const shown = items.slice(0, 5);
+
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-40">
-      <div className="mx-auto flex w-full max-w-md justify-end px-4">
-        <button
-          type="button"
-          onClick={onClick}
-          aria-label="Добавить вещь в гардероб"
-          className="pointer-events-auto grid size-14 place-items-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 transition hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-        >
-          <Plus className="size-6" />
-        </button>
-      </div>
-    </div>
+    <section className="space-y-3">
+      <SectionHeader
+        icon={Shirt}
+        title="Мои вещи"
+        hint={items.length > 0 ? `${items.length} в гардеробе` : "Пока пусто"}
+        action={
+          items.length > 0 ? (
+            <Link
+              to="/wardrobe"
+              className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium text-primary hover:bg-primary/5"
+            >
+              Все
+              <ArrowRight className="size-3.5" />
+            </Link>
+          ) : null
+        }
+      />
+
+      {items.length === 0 ? (
+        <div className="rounded-3xl border border-dashed border-border bg-card/60 px-5 py-6 text-center">
+          <p className="text-sm text-muted-foreground">
+            Добавьте первую вещь — образ появится сразу.
+          </p>
+          {onAddItem ? (
+            <Button className="mt-3 rounded-full" onClick={onAddItem}>
+              <Plus className="size-4" />
+              Добавить вещь
+            </Button>
+          ) : null}
+        </div>
+      ) : (
+        <ul className="divide-y divide-border/60 overflow-hidden rounded-3xl border border-border/60 bg-card">
+          {shown.map((item) => (
+            <li key={item.id} className="flex items-center gap-3 px-4 py-3">
+              <span
+                className="grid size-9 shrink-0 place-items-center rounded-xl bg-muted text-lg"
+                aria-hidden
+              >
+                {SLOT_EMOJI[item.slot]}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">{itemName(item)}</p>
+                <p className="text-xs text-muted-foreground">
+                  {item.color.label} · {formatItemRange(item)}
+                </p>
+              </div>
+              <span
+                className="size-4 shrink-0 rounded-full border border-border"
+                style={{ backgroundColor: item.color.hex }}
+                aria-hidden
+              />
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {items.length > shown.length ? (
+        <p className="text-xs text-muted-foreground">И ещё {items.length - shown.length} в гардеробе</p>
+      ) : null}
+    </section>
   );
 }
 
@@ -522,12 +535,12 @@ export default function HomePage({ onAddItem, onOpenOutfit }: HomePageProps) {
   const { weather, isFallback: isWeatherFallback } = useWeather();
   const {
     outfitOfTheDay,
-    alternatives,
+    items,
     isLoading: isOutfitsLoading,
     isRegenerating,
     error: outfitsError,
     regenerate,
-  } = useHomeOutfits();
+  } = useHomeOutfits(weather.temp);
 
   const userName = name?.trim() || "гость";
   const userInitial = userName.charAt(0).toUpperCase();
@@ -535,45 +548,57 @@ export default function HomePage({ onAddItem, onOpenOutfit }: HomePageProps) {
 
   return (
     <>
-      <header className="mb-5 flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs text-muted-foreground">{todayLabel}</p>
-          <h1 className="text-xl font-semibold tracking-tight">Привет, {userName} 👋</h1>
+      <PageHeader
+        eyebrow={todayLabel}
+        title={`Привет, ${userName} 👋`}
+        action={
+          <div className="grid size-10 place-items-center rounded-full bg-gradient-to-br from-amber-300 to-rose-300 text-sm font-semibold text-white shadow-sm">
+            {userInitial}
+          </div>
+        }
+      />
+
+      <main className="space-y-6 lg:grid lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)] lg:items-start lg:gap-6 lg:space-y-0">
+        <div className="space-y-6">
+          <Reveal>
+            <WeatherCard weather={weather} isFallback={isWeatherFallback} />
+          </Reveal>
+
+          {outfitsError ? (
+            <p
+              role="alert"
+              className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-2.5 text-xs text-destructive"
+            >
+              Не удалось прочитать гардероб: {outfitsError}
+            </p>
+          ) : null}
+
+          <Reveal delay={0.06}>
+            {isOutfitsLoading ? (
+              <OutfitSkeleton />
+            ) : outfitOfTheDay ? (
+              <OutfitOfTheDay
+                outfit={outfitOfTheDay}
+                isRegenerating={isRegenerating}
+                onRegenerate={regenerate}
+                onOpen={() => onOpenOutfit?.(outfitOfTheDay)}
+              />
+            ) : (
+              <EmptyOutfit onAddItem={onAddItem} />
+            )}
+          </Reveal>
         </div>
-        <div className="grid size-10 place-items-center rounded-full bg-gradient-to-br from-amber-300 to-rose-300 text-sm font-semibold text-white shadow-sm">
-          {userInitial}
+
+        <div className="space-y-6">
+          <Reveal delay={0.12}>
+            <AlternativesStub />
+          </Reveal>
+
+          <Reveal delay={0.18}>
+            <WardrobePreview items={items} onAddItem={onAddItem} />
+          </Reveal>
         </div>
-      </header>
-
-      <main className="space-y-6">
-        <WeatherCard weather={weather} isFallback={isWeatherFallback} />
-
-        {outfitsError ? (
-          <p
-            role="alert"
-            className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-2.5 text-xs text-destructive"
-          >
-            Не удалось прочитать гардероб: {outfitsError}
-          </p>
-        ) : null}
-
-        {isOutfitsLoading ? (
-          <OutfitSkeleton />
-        ) : outfitOfTheDay ? (
-          <OutfitOfTheDay
-            outfit={outfitOfTheDay}
-            isRegenerating={isRegenerating}
-            onRegenerate={regenerate}
-            onOpen={() => onOpenOutfit?.(outfitOfTheDay)}
-          />
-        ) : (
-          <EmptyOutfit onAddItem={onAddItem} />
-        )}
-
-        <AlternativesCarousel outfits={alternatives} onOpen={onOpenOutfit} />
       </main>
-
-      <AddItemFab onClick={onAddItem} />
     </>
   );
 }

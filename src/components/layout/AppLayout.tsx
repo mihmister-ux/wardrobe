@@ -3,20 +3,30 @@
 import { Outlet } from "react-router-dom";
 
 import { BottomDock, DockSpacer } from "@/components/layout/BottomDock";
+import { SideNav } from "@/components/layout/SideNav";
+
+export interface AppLayoutProps {
+  /** Открывает форму добавления вещи (кнопка в доке и в боковой панели). */
+  onAddItem?: () => void;
+}
 
 /**
- * Общий каркас всех экранов: фон, центрирующая колонка, отступ под док и сам
- * док. Страницы отдают только содержимое, поэтому навигация не дублируется.
+ * Общий каркас: на телефоне — колонка и нижний док, на ПК — боковая панель
+ * и широкий контент. Страницы отдают только содержимое.
  */
-export default function AppLayout() {
+export default function AppLayout({ onAddItem }: AppLayoutProps) {
   return (
     <div className="min-h-dvh bg-background">
-      <div className="mx-auto w-full max-w-md px-4 pt-5">
-        <Outlet />
-        <DockSpacer />
+      <SideNav onAddItem={onAddItem} />
+
+      <div className="md:pl-60">
+        <div className="mx-auto w-full max-w-md px-4 pt-5 md:max-w-5xl md:px-8 md:pt-8">
+          <Outlet />
+          <DockSpacer />
+        </div>
       </div>
 
-      <BottomDock />
+      <BottomDock onAddItem={onAddItem} />
     </div>
   );
 }

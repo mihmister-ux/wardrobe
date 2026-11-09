@@ -5,33 +5,22 @@ import { useLiveQuery } from "dexie-react-hooks";
 
 import { db } from "@/db/db";
 import type { Item } from "@/db/types";
+import { buildOutfits } from "@/features/home/buildOutfits";
 import type { Outfit as UiOutfit } from "@/features/home/HomePage";
 
 export interface HomeOutfits {
   outfitOfTheDay: UiOutfit | null;
+  /** Варианты на выбор: появятся в следующем шаге, пока карточка-заглушка. */
   alternatives: UiOutfit[];
+  items: Item[];
   isLoading: boolean;
   isRegenerating: boolean;
   error: string | null;
   regenerate: () => Promise<void>;
 }
 
-/** Сколько вещей попадает в образ дня. */
-const OUTFIT_SIZE = 4;
-
 const NO_ALTERNATIVES: UiOutfit[] = [];
-
-function slotEmoji(slot: Item["slot"]): string {
-  switch (slot) {
-    case "top": return "👕";
-    case "bottom": return "👖";
-    case "fullbody": return "👗";
-    case "outerwear": return "🧥";
-    case "shoes": return "👟";
-    case "accessory": return "🧣";
-    default: return "👕";
-  }
-}
+const NO_ITEMS: Item[] = [];
 
 /**
  * Чтение вещей для образа. Ошибку не бросаем, а возвращаем результатом:
@@ -53,31 +42,12 @@ async function readItems(): Promise<ItemsRead> {
   }
 }
 
-/** Заглушка генератора: берём OUTFIT_SIZE вещей со сдвигом `rotation`. */
-function buildOutfit(items: Item[], rotation: number): UiOutfit {
-  const start = rotation % items.length;
-  const picked = Array.from(
-    { length: Math.min(OUTFIT_SIZE, items.length) },
-    (_, i) => items[(start + i) % items.length],
-  );
-
-  return {
-    id: "outfit-1",
-    title: "Ваш первый образ",
-    note: "Собран из реальных вещей в базе",
-    score: 85,
-    tags: ["Из базы"],
-    items: picked.map((item) => ({
-      id: item.id,
-      name: item.label || item.type,
-      category: item.slot as any,
-      emoji: slotEmoji(item.slot),
-    })),
-    gradient: "from-sky-200 via-indigo-200 to-violet-200",
-  };
+/** Свежие вещи — сверху: так список на главной понятнее. */
+function newestFirst(items: readonly Item[]): Item[] {
+  return [...items].sort((left, right) => right.createdAt - left.createdAt);
 }
 
-export function useHomeOutfits(): HomeOutfits {
+export function useHomeOutfits(temperature: number): HomeOutfits {
   const [rotation, setRotation] = React.useState(0);
   const [isRegenerating, setIsRegenerating] = React.useState(false);
   const [readError, setReadError] = React.useState<string | null>(null);
@@ -85,13 +55,21 @@ export function useHomeOutfits(): HomeOutfits {
   // Живой запрос: Dexie перезапускает его при добавлении, удалении и правке вещей.
   const read = useLiveQuery<ItemsRead>(readItems, []);
 
-  const items = read?.items ?? null;
-  const outfitOfTheDay = React.useMemo(
-    () => (items && items.length > 0 ? buildOutfit(items, rotation) : null),
-    [items, rotation],
+  const items = React.useMemo(
+    () => (read?.items ? newestFirst(read.items) : NO_ITEMS),
+    [read],
   );
 
-  /** «Другой образ»: сдвигаем выборку и честно перечитываем базу. */
+  // Варианты уже отсортированы по баллу палитры: первый — самый удачный.
+  const outfits = React.useMemo(
+    () => (read?.items ? buildOutfits({ items: read.items, temperature }) : []),
+    [read, temperature],
+  );
+
+  const outfitOfTheDay =
+    outfits.length > 0 ? outfits[rotation % outfits.length] ?? null : null;
+
+  /** «Другой образ»: переходим к следующему варианту и перечитываем базу. */
   const regenerate = React.useCallback(async () => {
     setRotation((value) => value + 1);
     setIsRegenerating(true);
@@ -106,6 +84,7 @@ export function useHomeOutfits(): HomeOutfits {
   return {
     outfitOfTheDay,
     alternatives: NO_ALTERNATIVES,
+    items,
     isLoading: read === undefined,
     isRegenerating,
     error: read?.error ?? readError,

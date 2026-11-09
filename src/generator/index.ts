@@ -30,6 +30,7 @@ export * from './group';
 export * from './combine';
 export * from './score';
 export * from './explain';
+export * from './colors';
 
 /* ------------------------------- спецификация ---------------------------- */
 

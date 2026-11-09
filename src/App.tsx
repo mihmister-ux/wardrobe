@@ -17,7 +17,7 @@ export default function App() {
   return (
     <HashRouter>
       <Routes>
-        <Route element={<AppLayout />}>
+        <Route element={<AppLayout onAddItem={openAddItem} />}>
           <Route path="/" element={<HomePage onAddItem={openAddItem} />} />
           <Route path="/wardrobe" element={<WardrobePage onAddItem={openAddItem} />} />
           <Route path="/outfits" element={<OutfitsPage />} />

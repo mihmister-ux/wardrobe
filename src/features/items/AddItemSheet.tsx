@@ -4,7 +4,7 @@ import * as React from "react";
 import { ImagePlus, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { db } from "@/db/db";
-import type { Item, ItemColor, ItemStatus, Slot } from "@/db/types";
+import type { Item, ItemColor, ItemStatus, Slot, Warmth } from "@/db/types";
 import {
   COLORS,
   PATTERNS,
@@ -28,8 +28,8 @@ const SLOT_EMOJI: Record<Slot, string> = {
 const DEFAULT_STATUS: ItemStatus = "available";
 
 /* ── Сезон ──────────────────────────────────────────────────────────────
- * По фото плотность ткани не определить, поэтому сезон спрашиваем явно
- * и перекрываем им температурный диапазон из справочника типов.
+ * По фото плотность ткани не определить, поэтому сезон спрашиваем явно:
+ * он задаёт и температурный диапазон, и уровень тепла (warmth 1/3/5).
  * ─────────────────────────────────────────────────────────────────────── */
 
 type SeasonId = "summer" | "demi" | "winter";
@@ -40,12 +40,14 @@ interface SeasonDef {
   emoji: string;
   tempMin: number;
   tempMax: number;
+  /** Уровень тепла вещи: лето — 1, демисезон — 3, зима — 5. */
+  warmth: Warmth;
 }
 
 const SEASONS: readonly SeasonDef[] = [
-  { id: "summer", label: "Лето", emoji: "☀️", tempMin: 15, tempMax: 35 },
-  { id: "demi", label: "Демисезон", emoji: "🍂", tempMin: -5, tempMax: 15 },
-  { id: "winter", label: "Зима", emoji: "❄️", tempMin: -20, tempMax: 5 },
+  { id: "summer", label: "Лето", emoji: "☀️", tempMin: 15, tempMax: 35, warmth: 1 },
+  { id: "demi", label: "Демисезон", emoji: "🍂", tempMin: -5, tempMax: 15, warmth: 3 },
+  { id: "winter", label: "Зима", emoji: "❄️", tempMin: -20, tempMax: 5, warmth: 5 },
 ];
 
 const SEASON_MAP: Record<SeasonId, SeasonDef> = Object.fromEntries(
@@ -136,7 +138,7 @@ export default function AddItemSheet({ open, onOpenChange, onSaved }: AddItemShe
         id: itemId, type: defaults.type, slot: defaults.slot,
         label: form.label.trim() || `${type.label} · ${form.color.label}`,
         color: form.color, pattern: PATTERNS[0].id, texture: defaults.texture,
-        warmth: defaults.warmth, tempMin: season.tempMin, tempMax: season.tempMax,
+        warmth: season.warmth, tempMin: season.tempMin, tempMax: season.tempMax,
         waterResistance: defaults.waterResistance, windproof: defaults.windproof,
         formality: defaults.formality, occasions: defaults.occasions,
         tags: [], status: DEFAULT_STATUS, favorite: false,
@@ -210,15 +212,15 @@ export default function AddItemSheet({ open, onOpenChange, onSaved }: AddItemShe
                   >
                     <span className="text-lg leading-none" aria-hidden>{season.emoji}</span>
                     <span className="font-medium leading-tight">{season.label}</span>
-                    <span className="text-[10px] leading-tight tabular-nums">{formatRange(season)}</span>
+                    <span className="text-xs leading-tight tabular-nums">{formatRange(season)}</span>
                   </button>
                 );
               })}
             </div>
             <p className="text-xs text-muted-foreground">
               {form.season
-                ? `В образы вещь попадёт при ${formatRange(SEASON_MAP[form.season])}.`
-                : "Выберите сезон: от него зависит, при какой погоде вещь попадёт в образ."}
+                ? `В образы вещь попадёт при ${formatRange(SEASON_MAP[form.season])}, плотность ${SEASON_MAP[form.season].warmth} из 5.`
+                : "Выберите сезон: от него зависят и температура, при которой вещь попадёт в образ, и её плотность."}
             </p>
           </div>
 
