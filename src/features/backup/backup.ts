@@ -316,6 +316,7 @@ function sanitizePhoto(value: unknown): SerializedPhoto | null {
     width: Math.max(0, Math.round(asNumber(value.width, 0))),
     height: Math.max(0, Math.round(asNumber(value.height, 0))),
     bytes: Math.max(0, Math.round(asNumber(value.bytes, 0))),
+    fileName: asString(value.fileName) ?? undefined,
     createdAt: Math.round(asNumber(value.createdAt, Date.now())),
   };
 }
@@ -462,6 +463,7 @@ export async function applyBackup(draft: BackupDraft): Promise<ImportResult> {
         height: photo.height,
         // Размер считаем по факту: в старых файлах метаданные могут врать.
         bytes: main.size,
+        fileName: photo.fileName,
         createdAt: photo.createdAt,
       };
     }),

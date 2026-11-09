@@ -15,7 +15,14 @@ import {
 } from "@/db/seed/references";
 import { db } from "@/db/db";
 import type { Item, ItemColor, Pattern, Slot, Texture } from "@/db/types";
+import { SeasonPicker } from "@/features/items/SeasonPicker";
 import { SLOT_EMOJI, itemName } from "@/features/items/itemView";
+import {
+  mergeSeasonRanges,
+  sameSeasons,
+  seasonsForRange,
+  type SeasonId,
+} from "@/features/items/seasons";
 import { ItemPhoto } from "@/features/wardrobe/ItemPhoto";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +35,7 @@ interface FormState {
   label: string;
   slot: Slot;
   type: string;
+  seasons: SeasonId[];
   color: ItemColor;
   pattern: Pattern;
   texture: Texture;
@@ -40,6 +48,7 @@ function initialForm(item: Item): FormState {
     label: item.label ?? "",
     slot: item.slot,
     type: item.type,
+    seasons: seasonsForRange(item.tempMin, item.tempMax),
     color: item.color,
     pattern: item.pattern,
     texture: item.texture,
@@ -55,6 +64,13 @@ function initialForm(item: Item): FormState {
 export function EditItemSheet({ item, onClose }: EditItemSheetProps) {
   const [form, setForm] = React.useState<FormState>(() => initialForm(item));
   const titleId = React.useId();
+
+  // Исходный набор нужен, чтобы не сузить старый произвольный диапазон,
+  // если пользователь меняет только название или цвет.
+  const initialSeasons = React.useMemo(
+    () => seasonsForRange(item.tempMin, item.tempMax),
+    [item.tempMin, item.tempMax],
+  );
 
   React.useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -89,10 +105,21 @@ export function EditItemSheet({ item, onClose }: EditItemSheetProps) {
     }));
   };
 
-  const canSave = !form.isSaving;
+  const canSave = !form.isSaving && form.seasons.length > 0;
 
   const handleSave = async () => {
     if (!canSave) return;
+    const merged = mergeSeasonRanges(form.seasons);
+    if (!merged) return;
+    const seasonsChanged = !sameSeasons(form.seasons, initialSeasons);
+    const range = seasonsChanged
+      ? merged
+      : {
+          tempMin: item.tempMin,
+          tempMax: item.tempMax,
+          warmth: item.warmth,
+        };
+
     setForm((state) => ({ ...state, isSaving: true, error: null }));
     try {
       const label = form.label.trim();
@@ -104,6 +131,9 @@ export function EditItemSheet({ item, onClose }: EditItemSheetProps) {
         color: form.color,
         pattern: form.pattern,
         texture: form.texture,
+        warmth: range.warmth,
+        tempMin: range.tempMin,
+        tempMax: range.tempMax,
         updatedAt: Date.now(),
       });
       onClose();
@@ -157,8 +187,8 @@ export function EditItemSheet({ item, onClose }: EditItemSheetProps) {
               <ItemPhoto item={item} className="h-full w-full object-cover" />
             </div>
             <p className="text-xs leading-relaxed text-muted-foreground">
-              Фото остаётся прежним. Меняются название, раздел, цвет, узор и
-              ткань — подбор образа сразу учтёт правки.
+              Фото остаётся прежним. Меняются название, раздел, сезоны, цвет,
+              узор и ткань — подбор образа сразу учтёт правки.
             </p>
           </div>
 
@@ -250,6 +280,12 @@ export function EditItemSheet({ item, onClose }: EditItemSheetProps) {
             </div>
           </div>
 
+          <SeasonPicker
+            value={form.seasons}
+            onChange={(seasons) => setField("seasons", seasons)}
+            disabled={form.isSaving}
+          />
+
           <div className="space-y-2">
             <p className="text-sm font-medium">Цвет</p>
             <div className="flex flex-wrap gap-1.5">
@@ -335,6 +371,12 @@ export function EditItemSheet({ item, onClose }: EditItemSheetProps) {
           {form.error ? (
             <p role="alert" className="text-sm text-destructive">
               {form.error}
+            </p>
+          ) : null}
+
+          {form.seasons.length === 0 ? (
+            <p role="alert" className="text-xs text-destructive">
+              Выберите хотя бы один сезон.
             </p>
           ) : null}
 

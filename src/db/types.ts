@@ -47,6 +47,8 @@ export interface Photo {
   width: number;
   height: number;
   bytes: number;
+  /** Имя исходного файла: по нему пакетная загрузка пропускает дубликаты. */
+  fileName?: string;
   createdAt: number;
 }
 

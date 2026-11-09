@@ -4,7 +4,7 @@ import * as React from "react";
 import { Camera, ImagePlus, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { db } from "@/db/db";
-import type { Item, ItemColor, ItemStatus, Warmth } from "@/db/types";
+import type { Item, ItemColor, ItemStatus } from "@/db/types";
 import {
   COLORS,
   PATTERNS,
@@ -13,44 +13,12 @@ import {
   TYPE_MAP,
   buildItemDefaults,
 } from "@/db/seed/references";
+import { SeasonPicker } from "@/features/items/SeasonPicker";
 import { SLOT_EMOJI } from "@/features/items/itemView";
+import { mergeSeasonRanges, type SeasonId } from "@/features/items/seasons";
 import { cn } from "@/lib/utils";
 
 const DEFAULT_STATUS: ItemStatus = "available";
-
-/* ── Сезон ──────────────────────────────────────────────────────────────
- * По фото плотность ткани не определить, поэтому сезон спрашиваем явно:
- * он задаёт и температурный диапазон, и уровень тепла (warmth 1/3/5).
- * ─────────────────────────────────────────────────────────────────────── */
-
-type SeasonId = "summer" | "demi" | "winter";
-
-interface SeasonDef {
-  id: SeasonId;
-  label: string;
-  emoji: string;
-  tempMin: number;
-  tempMax: number;
-  /** Уровень тепла вещи: лето — 1, демисезон — 3, зима — 5. */
-  warmth: Warmth;
-}
-
-const SEASONS: readonly SeasonDef[] = [
-  { id: "summer", label: "Лето", emoji: "☀️", tempMin: 15, tempMax: 35, warmth: 1 },
-  { id: "demi", label: "Демисезон", emoji: "🍂", tempMin: -5, tempMax: 15, warmth: 3 },
-  { id: "winter", label: "Зима", emoji: "❄️", tempMin: -20, tempMax: 5, warmth: 5 },
-];
-
-const SEASON_MAP: Record<SeasonId, SeasonDef> = Object.fromEntries(
-  SEASONS.map((season) => [season.id, season]),
-) as Record<SeasonId, SeasonDef>;
-
-/** Минус типографский: −5 читается лучше, чем -5. */
-const formatTemp = (value: number): string =>
-  value < 0 ? `−${Math.abs(value)}` : String(value);
-
-const formatRange = (season: Pick<SeasonDef, "tempMin" | "tempMax">): string =>
-  `${formatTemp(season.tempMin)}…${formatTemp(season.tempMax)} °C`;
 
 // Сжатие WebP
 const MAX_DIMENSION = 800;
@@ -58,7 +26,7 @@ const THUMB_DIMENSION = 160;
 const WEBP_QUALITY = 0.82;
 const THUMB_QUALITY = 0.7;
 
-interface CompressedImage { blob: Blob; thumb: Blob; width: number; height: number; }
+interface CompressedImage { blob: Blob; thumb: Blob; width: number; height: number; fileName: string; }
 
 function renderToWebP(source: HTMLImageElement | ImageBitmap, maxDimension: number, quality: number) {
   const scale = Math.min(1, maxDimension / Math.max(source.width, source.height));
@@ -80,15 +48,15 @@ async function compressImage(file: File): Promise<CompressedImage> {
     const img = await new Promise<HTMLImageElement>((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
     const main = await renderToWebP(img, MAX_DIMENSION, WEBP_QUALITY);
     const thumb = await renderToWebP(img, THUMB_DIMENSION, THUMB_QUALITY);
-    return { blob: main.blob, thumb: thumb.blob, width: main.width, height: main.height };
+    return { blob: main.blob, thumb: thumb.blob, width: main.width, height: main.height, fileName: file.name };
   } finally { URL.revokeObjectURL(url); }
 }
 
 export interface AddItemSheetProps { open: boolean; onOpenChange: (open: boolean) => void; onSaved?: (item: Item) => void; }
 
-interface FormState { photo: CompressedImage | null; previewUrl: string | null; typeId: string | null; season: SeasonId | null; color: ItemColor | null; label: string; isSaving: boolean; error: string | null; }
+interface FormState { photo: CompressedImage | null; previewUrl: string | null; typeId: string | null; seasons: SeasonId[]; color: ItemColor | null; label: string; isSaving: boolean; error: string | null; }
 
-const INITIAL: FormState = { photo: null, previewUrl: null, typeId: null, season: null, color: null, label: "", isSaving: false, error: null };
+const INITIAL: FormState = { photo: null, previewUrl: null, typeId: null, seasons: [], color: null, label: "", isSaving: false, error: null };
 
 export default function AddItemSheet({ open, onOpenChange, onSaved }: AddItemSheetProps) {
   const [form, setForm] = React.useState<FormState>(INITIAL);
@@ -129,27 +97,27 @@ export default function AddItemSheet({ open, onOpenChange, onSaved }: AddItemShe
     } catch (err) { setField("error", err instanceof Error ? err.message : "Ошибка фото"); }
   };
 
-  const canSave = form.photo !== null && form.typeId !== null && form.season !== null && form.color !== null && !form.isSaving;
+  const canSave = form.photo !== null && form.typeId !== null && form.seasons.length > 0 && form.color !== null && !form.isSaving;
 
   const handleSave = async () => {
-    if (!canSave || !form.photo || !form.typeId || !form.season || !form.color) return;
+    if (!canSave || !form.photo || !form.typeId || !form.color) return;
     const type = TYPE_MAP[form.typeId];
     const defaults = buildItemDefaults(form.typeId);
-    if (!type || !defaults) return;
-    const season = SEASON_MAP[form.season];
+    const range = mergeSeasonRanges(form.seasons);
+    if (!type || !defaults || !range) return;
     setForm((s) => ({ ...s, isSaving: true, error: null }));
     try {
       const now = Date.now();
       const itemId = crypto.randomUUID();
       const photoId = crypto.randomUUID();
 
-      await db.photos.add({ id: photoId, itemId, main: form.photo.blob, thumb: form.photo.thumb, mime: "image/webp", width: form.photo.width, height: form.photo.height, bytes: form.photo.blob.size, createdAt: now });
+      await db.photos.add({ id: photoId, itemId, main: form.photo.blob, thumb: form.photo.thumb, mime: "image/webp", width: form.photo.width, height: form.photo.height, bytes: form.photo.blob.size, fileName: form.photo.fileName, createdAt: now });
 
       const item: Item = {
         id: itemId, type: defaults.type, slot: defaults.slot,
         label: form.label.trim() || `${type.label} · ${form.color.label}`,
         color: form.color, pattern: PATTERNS[0].id, texture: defaults.texture,
-        warmth: season.warmth, tempMin: season.tempMin, tempMax: season.tempMax,
+        warmth: range.warmth, tempMin: range.tempMin, tempMax: range.tempMax,
         waterResistance: defaults.waterResistance, windproof: defaults.windproof,
         formality: defaults.formality, occasions: defaults.occasions,
         tags: [], status: DEFAULT_STATUS, favorite: false,
@@ -262,33 +230,11 @@ export default function AddItemSheet({ open, onOpenChange, onSaved }: AddItemShe
             ))}
           </div>
 
-          <div className="space-y-2">
-            <p className="text-sm font-medium">Сезон</p>
-            <div className="grid grid-cols-3 gap-2">
-              {SEASONS.map((season) => {
-                const isSelected = form.season === season.id;
-                return (
-                  <button
-                    key={season.id}
-                    type="button"
-                    onClick={() => setField("season", season.id)}
-                    aria-label={`${season.label}, ${formatRange(season)}`}
-                    aria-pressed={isSelected}
-                    className={cn("flex flex-col items-center gap-0.5 rounded-2xl border px-1 py-2 text-xs transition", isSelected ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/40")}
-                  >
-                    <span className="text-lg leading-none" aria-hidden>{season.emoji}</span>
-                    <span className="font-medium leading-tight">{season.label}</span>
-                    <span className="text-xs leading-tight tabular-nums">{formatRange(season)}</span>
-                  </button>
-                );
-              })}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {form.season
-                ? `В образы вещь попадёт при ${formatRange(SEASON_MAP[form.season])}, плотность ${SEASON_MAP[form.season].warmth} из 5.`
-                : "Выберите сезон: от него зависят и температура, при которой вещь попадёт в образ, и её плотность."}
-            </p>
-          </div>
+          <SeasonPicker
+            value={form.seasons}
+            onChange={(seasons) => setField("seasons", seasons)}
+            disabled={form.isSaving}
+          />
 
           <div className="space-y-2">
             <p className="text-sm font-medium">Цвет</p>
@@ -327,7 +273,8 @@ export default function AddItemSheet({ open, onOpenChange, onSaved }: AddItemShe
 
           {!canSave && !form.isSaving ? (
             <p className="text-center text-xs text-muted-foreground">
-              Нужны фото, тип, сезон и цвет — название можно не заполнять.
+              Нужны фото, тип, хотя бы один сезон и цвет — название можно не
+              заполнять.
             </p>
           ) : null}
         </div>

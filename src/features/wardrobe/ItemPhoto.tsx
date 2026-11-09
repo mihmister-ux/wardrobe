@@ -5,7 +5,11 @@ import * as React from "react";
 import { db } from "@/db/db";
 import type { Item } from "@/db/types";
 import { itemName, SLOT_EMOJI } from "@/features/items/itemView";
+import { needsThumbUpgrade, queueThumbCreation } from "@/features/wardrobe/photoThumb";
 import { cn } from "@/lib/utils";
+
+/** Одно фото не пересобираем дважды, даже если карточка перемонтировалась. */
+const upgrading = new Set<string>();
 
 /**
  * Фото вещи лежит в IndexedDB блобом, поэтому показываем его через
@@ -21,16 +25,37 @@ function usePhotoUrl(photoId: string | undefined): string | null {
     let cancelled = false;
     let objectUrl: string | null = null;
 
-    db.photos
-      .get(photoId)
-      .then((photo) => {
+    const show = (blob: Blob) => {
+      if (cancelled) return;
+      const url = URL.createObjectURL(blob);
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      objectUrl = url;
+      setLoaded({ id: photoId, url });
+    };
+
+    void (async () => {
+      try {
+        const photo = await db.photos.get(photoId);
         if (cancelled || !photo) return;
-        objectUrl = URL.createObjectURL(photo.thumb);
-        setLoaded({ id: photoId, url: objectUrl });
-      })
-      .catch(() => {
+
+        show(photo.thumb);
+
+        // Старые импорты хранили JPEG: прозрачность в нём уже потеряна.
+        // Пересобираем из основного файла и обновляем базу один раз.
+        if (!needsThumbUpgrade(photo.thumb) || upgrading.has(photoId)) return;
+        upgrading.add(photoId);
+        try {
+          const thumb = await queueThumbCreation(photo.main, () => cancelled);
+          if (!thumb || cancelled) return;
+          await db.photos.update(photo.id, { thumb });
+          show(thumb);
+        } finally {
+          upgrading.delete(photoId);
+        }
+      } catch {
         // Нет фото — покажем эмодзи слота, вещь останется в списке.
-      });
+      }
+    })();
 
     return () => {
       cancelled = true;
