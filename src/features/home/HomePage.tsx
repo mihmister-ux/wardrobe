@@ -579,7 +579,7 @@ export default function HomePage({ onAddItem, onOpenOutfit }: HomePageProps) {
       </div>
 
       <AddItemFab onClick={onAddItem} />
-      <BottomDock active="home" />
+      <BottomDock />
     </div>
   );
 }

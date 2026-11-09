@@ -1,5 +1,27 @@
-import HomePage from './features/home/HomePage';
+import { useState } from "react";
+import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
+
+import AddItemSheet from "./features/items/AddItemSheet";
+import HomePage from "./features/home/HomePage";
+import OutfitsPage from "./features/outfits/OutfitsPage";
+import ProfilePage from "./features/profile/ProfilePage";
+import WardrobePage from "./features/wardrobe/WardrobePage";
 
 export default function App() {
-  return <HomePage />;
+  const [isAddItemOpen, setAddItemOpen] = useState(false);
+  const openAddItem = () => setAddItemOpen(true);
+
+  return (
+    <HashRouter>
+      <Routes>
+        <Route path="/" element={<HomePage onAddItem={openAddItem} />} />
+        <Route path="/wardrobe" element={<WardrobePage onAddItem={openAddItem} />} />
+        <Route path="/outfits" element={<OutfitsPage />} />
+        <Route path="/profile" element={<ProfilePage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+
+      <AddItemSheet open={isAddItemOpen} onOpenChange={setAddItemOpen} />
+    </HashRouter>
+  );
 }
