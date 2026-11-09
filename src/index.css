@@ -16,4 +16,6 @@
   --color-border: #e4e4e7;
   --color-input: #e4e4e7;
   --color-ring: #18181b;
+  --color-destructive: #dc2626;
+  --color-destructive-foreground: #ffffff;
 }

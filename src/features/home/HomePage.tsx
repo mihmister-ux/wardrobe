@@ -24,7 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Reveal } from "@/components/ui/reveal";
 import type { Item } from "@/db/types";
-import { formatItemRange, itemName, SLOT_EMOJI } from "@/features/home/buildOutfits";
+import { formatItemRange, itemName, SLOT_EMOJI } from "@/features/items/itemView";
 import { useHomeOutfits } from "@/features/home/useHomeOutfits";
 import { useWeather } from "@/features/home/useWeather";
 import { useUserName } from "@/features/settings/useUserName";

@@ -1,10 +1,10 @@
  "use client";
 
 import * as React from "react";
-import { ImagePlus, Loader2, X } from "lucide-react";
+import { Camera, ImagePlus, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { db } from "@/db/db";
-import type { Item, ItemColor, ItemStatus, Slot, Warmth } from "@/db/types";
+import type { Item, ItemColor, ItemStatus, Warmth } from "@/db/types";
 import {
   COLORS,
   PATTERNS,
@@ -13,17 +13,8 @@ import {
   TYPE_MAP,
   buildItemDefaults,
 } from "@/db/seed/references";
+import { SLOT_EMOJI } from "@/features/items/itemView";
 import { cn } from "@/lib/utils";
-
-/** Эмодзи на слот: в справочнике хранятся иконки, а не эмодзи. */
-const SLOT_EMOJI: Record<Slot, string> = {
-  fullbody: "👗",
-  top: "👕",
-  bottom: "👖",
-  outerwear: "🧥",
-  shoes: "👟",
-  accessory: "🧣",
-};
 
 const DEFAULT_STATUS: ItemStatus = "available";
 
@@ -101,11 +92,31 @@ const INITIAL: FormState = { photo: null, previewUrl: null, typeId: null, season
 
 export default function AddItemSheet({ open, onOpenChange, onSaved }: AddItemSheetProps) {
   const [form, setForm] = React.useState<FormState>(INITIAL);
-  const fileRef = React.useRef<HTMLInputElement>(null);
+  const galleryRef = React.useRef<HTMLInputElement>(null);
+  const cameraRef = React.useRef<HTMLInputElement>(null);
+  const titleId = React.useId();
 
   React.useEffect(() => {
-    if (!open) { if (form.previewUrl) URL.revokeObjectURL(form.previewUrl); setForm(INITIAL); }
+    if (open) return;
+    if (form.previewUrl) URL.revokeObjectURL(form.previewUrl);
+    setForm(INITIAL);
+    // previewUrl намеренно не в зависимостях: чистим ссылку один раз при закрытии.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !form.isSaving) onOpenChange(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open, form.isSaving, onOpenChange]);
 
   const setField = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((s) => ({ ...s, [key]: value, error: null }));
 
@@ -157,26 +168,80 @@ export default function AddItemSheet({ open, onOpenChange, onSaved }: AddItemShe
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center">
-      <div className="w-full max-w-md rounded-t-3xl bg-white p-5 sm:rounded-3xl">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold">Новая вещь</h2>
-          <Button variant="outline" size="icon" onClick={() => onOpenChange(false)}><X className="size-4" /></Button>
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !form.isSaving) onOpenChange(false);
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="w-full max-w-md rounded-t-3xl bg-card shadow-2xl"
+      >
+        <div className="flex items-center justify-between px-5 pt-5">
+          <h2 id={titleId} className="text-xl font-semibold">Новая вещь</h2>
+          <Button variant="outline" size="icon" className="rounded-full" onClick={() => onOpenChange(false)} aria-label="Закрыть"><X className="size-4" /></Button>
         </div>
 
-        <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+        <div className="max-h-[70vh] space-y-4 overflow-y-auto px-5 py-4">
           <div className="space-y-2">
             <p className="text-sm font-medium">Фото</p>
-            <input ref={fileRef} type="file" accept="image/*" className="sr-only" onChange={(e) => void handleFile(e.target.files?.[0])} />
+            <input
+              ref={galleryRef}
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              aria-label="Выбрать фото из галереи"
+              onChange={(event) => {
+                void handleFile(event.target.files?.[0]);
+                event.target.value = "";
+              }}
+            />
+            <input
+              ref={cameraRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="sr-only"
+              aria-label="Сделать фото на камеру"
+              onChange={(event) => {
+                void handleFile(event.target.files?.[0]);
+                event.target.value = "";
+              }}
+            />
             {form.previewUrl ? (
               <div className="relative">
-                <img src={form.previewUrl} alt="Превью" className="aspect-square w-full rounded-2xl object-cover" />
-                <Button variant="outline" size="icon" className="absolute top-2 right-2 size-8 rounded-full bg-white/80" onClick={() => setForm((s) => ({ ...s, photo: null, previewUrl: null }))}><X className="size-4" /></Button>
+                <img src={form.previewUrl} alt="Превью вещи" className="aspect-square max-h-72 w-full rounded-2xl border border-border object-cover" />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  aria-label="Убрать фото"
+                  className="absolute top-2 right-2 size-8 rounded-full bg-background/85 backdrop-blur"
+                  onClick={() => {
+                    URL.revokeObjectURL(form.previewUrl!);
+                    setForm((s) => ({ ...s, photo: null, previewUrl: null }));
+                  }}
+                >
+                  <X className="size-4" />
+                </Button>
               </div>
             ) : (
-              <button type="button" onClick={() => fileRef.current?.click()} className="grid aspect-square w-full place-items-center rounded-2xl border-2 border-dashed border-border text-muted-foreground hover:border-primary">
-                <span className="flex flex-col items-center gap-1.5"><ImagePlus className="size-8" /><span className="text-sm">Загрузить фото</span></span>
-              </button>
+              <div className="grid grid-cols-2 gap-2">
+                <PhotoSourceButton
+                  icon={Camera}
+                  title="Сделать фото"
+                  hint="камера"
+                  onClick={() => cameraRef.current?.click()}
+                />
+                <PhotoSourceButton
+                  icon={ImagePlus}
+                  title="Из галереи"
+                  hint="выбрать файл"
+                  onClick={() => galleryRef.current?.click()}
+                />
+              </div>
             )}
           </div>
 
@@ -241,12 +306,56 @@ export default function AddItemSheet({ open, onOpenChange, onSaved }: AddItemShe
           </div>
         </div>
 
-        {form.error && <p className="mt-2 text-sm text-red-500">{form.error}</p>}
+        <div className="space-y-2 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-1">
+          {form.error && <p role="alert" className="text-sm text-destructive">{form.error}</p>}
 
-        <Button onClick={() => void handleSave()} disabled={!canSave} className="mt-4 w-full rounded-full">
-          {form.isSaving ? <><Loader2 className="mr-2 size-4 animate-spin" /> Сохраняем…</> : "Сохранить"}
-        </Button>
+          <Button
+            onClick={() => void handleSave()}
+            disabled={!canSave}
+            className="w-full rounded-full"
+          >
+            {form.isSaving ? (
+              <>
+                <Loader2 className="mr-2 size-4 animate-spin" />
+                Сохраняем…
+              </>
+            ) : (
+              "Сохранить"
+            )}
+          </Button>
+
+          {!canSave && !form.isSaving ? (
+            <p className="text-center text-xs text-muted-foreground">
+              Нужны фото, тип, сезон и цвет — название можно не заполнять.
+            </p>
+          ) : null}
+        </div>
       </div>
     </div>
+  );
+}
+
+/** Кнопка-источник фото: камера или галерея. */
+function PhotoSourceButton({
+  icon: Icon,
+  title,
+  hint,
+  onClick,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  hint: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex aspect-square flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-border px-2 text-muted-foreground transition hover:border-primary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <Icon className="size-7" />
+      <span className="text-sm font-medium leading-tight">{title}</span>
+      <span className="text-xs leading-tight">{hint}</span>
+    </button>
   );
 }

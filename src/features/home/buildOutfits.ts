@@ -9,21 +9,12 @@
  */
 
 import type { Item, Slot } from "@/db/types";
-import { TYPE_MAP } from "@/db/seed/references";
 import { assessPalette, type HarmonyId, type PalettePiece } from "@/generator/colors";
+import { itemName, itemTypeLabel, SLOT_EMOJI } from "@/features/items/itemView";
 import type { Outfit as UiOutfit } from "@/features/home/HomePage";
 
 /** Сколько вариантов держим в памяти под кнопку «другой образ». */
 const MAX_VARIANTS = 12;
-
-export const SLOT_EMOJI: Record<Slot, string> = {
-  fullbody: "👗",
-  top: "👕",
-  bottom: "👖",
-  outerwear: "🧥",
-  shoes: "👟",
-  accessory: "🧣",
-};
 
 const GRADIENTS: Record<HarmonyId, string> = {
   monochrome: "from-stone-200 via-amber-100 to-orange-200",
@@ -36,22 +27,13 @@ const GRADIENTS: Record<HarmonyId, string> = {
   mixed: "from-sky-200 via-indigo-200 to-violet-200",
 };
 
-/** Название вещи: своё название, иначе — тип из справочника. */
-export function itemName(item: Item): string {
-  return item.label?.trim() || TYPE_MAP[item.type]?.label || item.type;
-}
-
 /** Короткое имя для заголовка образа: только тип, без цвета. */
 function shortName(item: Item): string {
-  return TYPE_MAP[item.type]?.label ?? itemName(item);
+  return itemTypeLabel(item);
 }
 
 function tempText(value: number): string {
   return value < 0 ? `−${Math.abs(value)}` : String(value);
-}
-
-export function formatItemRange(item: Item): string {
-  return `${tempText(item.tempMin)}…${tempText(item.tempMax)} °C`;
 }
 
 function seasonLabel(temperature: number): string {
