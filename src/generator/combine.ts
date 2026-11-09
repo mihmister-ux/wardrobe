@@ -226,7 +226,7 @@ export function combineSequential<V>(
       acc = item;
       continue;
     }
-   const produced: any = toList(operator(acc, item, rng))[0] ?? null;
+    const produced: Candidate<V> | null = toList(operator(acc, item, rng))[0] ?? null;
     if (produced === null) {
       chain.push(acc);
       acc = item;

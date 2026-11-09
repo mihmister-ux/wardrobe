@@ -7,6 +7,7 @@ import {
   Cloud,
   CloudRain,
   CloudSun,
+  Compass,
   Droplets,
   Heart,
   LayoutGrid,
@@ -23,8 +24,10 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Reveal } from "@/components/ui/reveal";
-import type { Item } from "@/db/types";
+import { OCCASION_MAP } from "@/db/seed/references";
+import type { Item, Occasion } from "@/db/types";
 import { formatItemRange, itemName, SLOT_EMOJI } from "@/features/items/itemView";
+import type { OutfitScore } from "@/features/home/scoreOutfit";
 import { useHomeOutfits } from "@/features/home/useHomeOutfits";
 import { useWeather } from "@/features/home/useWeather";
 import { useUserName } from "@/features/settings/useUserName";
@@ -66,7 +69,10 @@ export interface Outfit {
   harmony: string;
   /** HEX цветов образа — точки палитры. */
   palette: string[];
+  /** Итоговая оценка 0..100: цвет + погода + формальность. */
   score: number;
+  /** Из чего сложился процент — показываем под заголовком. */
+  scoreParts: OutfitScore;
   tags: string[];
   items: OutfitItem[];
   gradient: string;
@@ -144,7 +150,17 @@ function SectionHeader({
   );
 }
 
-function ScoreRing({ value, size = 56, stroke = 5 }: { value: number; size?: number; stroke?: number }) {
+function ScoreRing({
+  value,
+  size = 56,
+  stroke = 5,
+  ariaLabel,
+}: {
+  value: number;
+  size?: number;
+  stroke?: number;
+  ariaLabel?: string;
+}) {
   const clamped = Math.max(0, Math.min(100, value));
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -152,6 +168,8 @@ function ScoreRing({ value, size = 56, stroke = 5 }: { value: number; size?: num
 
   return (
     <div
+      role="img"
+      aria-label={ariaLabel ?? `Оценка образа ${Math.round(clamped)}%`}
       className="relative grid place-items-center rounded-full bg-background/85 backdrop-blur"
       style={{ width: size, height: size }}
     >
@@ -175,7 +193,9 @@ function ScoreRing({ value, size = 56, stroke = 5 }: { value: number; size?: num
           className="stroke-primary transition-[stroke-dasharray] duration-500"
         />
       </svg>
-      <span className="absolute text-xs font-semibold tabular-nums">{Math.round(clamped)}%</span>
+      <span aria-hidden className="absolute text-xs font-semibold tabular-nums">
+        {Math.round(clamped)}%
+      </span>
     </div>
   );
 }
@@ -252,21 +272,88 @@ function WeatherCard({ weather, isFallback = false }: { weather: Weather; isFall
 }
 
 /* ========================================================================== */
+/*  1.1 Ситуация: куда собираемся                                             */
+/* ========================================================================== */
+
+const SITUATIONS = [
+  { id: "home", emoji: "🏠" },
+  { id: "work", emoji: "💼" },
+  { id: "walk", emoji: "🌳" },
+  { id: "evening", emoji: "🥂" },
+] as const satisfies readonly { id: Occasion; emoji: string }[];
+
+/** Будни — работа, выходные — прогулка: разумный старт без лишних кликов. */
+function defaultOccasion(now = new Date()): Occasion {
+  const day = now.getDay();
+  return day === 0 || day === 6 ? "walk" : "work";
+}
+
+function SituationPicker({
+  value,
+  onChange,
+}: {
+  value: Occasion;
+  onChange: (next: Occasion) => void;
+}) {
+  return (
+    <section aria-labelledby="situation-title" className="space-y-2">
+      <div className="flex items-end justify-between gap-3">
+        <h2
+          id="situation-title"
+          className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+        >
+          <Compass className="size-4" />
+          Куда собираемся
+        </h2>
+        <span className="text-xs text-muted-foreground">влияет на оценку</span>
+      </div>
+
+      <div role="group" aria-label="Ситуация" className="flex flex-wrap gap-1">
+        {SITUATIONS.map(({ id, emoji }) => {
+          const isActive = id === value;
+          return (
+            <button
+              key={id}
+              type="button"
+              aria-pressed={isActive}
+              onClick={() => onChange(id)}
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full border px-2.5 py-1.5 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                isActive
+                  ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                  : "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground",
+              )}
+            >
+              <span aria-hidden>{emoji}</span>
+              {OCCASION_MAP[id].label}
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+/* ========================================================================== */
 /*  2. Образ дня                                                              */
 /* ========================================================================== */
 
 function OutfitOfTheDay({
   outfit,
+  situation,
   onOpen,
   onRegenerate,
   isRegenerating = false,
 }: {
   outfit: Outfit;
+  /** Подпись выбранной ситуации — в пояснении к оценке. */
+  situation: string;
   onOpen?: () => void;
   onRegenerate?: () => void;
   isRegenerating?: boolean;
 }) {
   const [saved, setSaved] = React.useState(false);
+  const parts = outfit.scoreParts;
 
   return (
     <section className="space-y-3">
@@ -290,7 +377,10 @@ function OutfitOfTheDay({
           </div>
 
           <div className="absolute right-3 top-3">
-            <ScoreRing value={outfit.score} />
+            <ScoreRing
+              value={outfit.score}
+              ariaLabel={`Оценка образа ${outfit.score}%: цвет ${parts.color}, погода ${parts.temperature} из 10, ситуация ${parts.formality} из 5`}
+            />
           </div>
 
           <button
@@ -308,6 +398,30 @@ function OutfitOfTheDay({
           <div className="space-y-1">
             <h3 className="text-base font-semibold leading-tight">{outfit.title}</h3>
             <p className="text-sm text-muted-foreground">{outfit.note}</p>
+          </div>
+
+          <div className="space-y-1">
+            <div
+              className="flex flex-wrap items-center gap-1.5 text-[11px]"
+              title="Процент = сочетаемость цвета + до 10 за погоду + до 5 за уместность"
+            >
+              <span className="font-semibold text-foreground">
+                Оценка {outfit.score}%
+              </span>
+              <span className="rounded-full border border-border px-2 py-0.5 text-muted-foreground">
+                цвет {parts.color}
+              </span>
+              <span className="rounded-full border border-border px-2 py-0.5 text-muted-foreground">
+                погода +{parts.temperature}/10
+              </span>
+              <span className="rounded-full border border-border px-2 py-0.5 text-muted-foreground">
+                ситуация +{parts.formality}/5
+              </span>
+            </div>
+            <p className="text-[11px] leading-snug text-muted-foreground">
+              Процент складывается из трёх: гармония цвета, уместность по погоде
+              и формальность для ситуации «{situation}».
+            </p>
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -533,6 +647,7 @@ export interface HomePageProps {
 export default function HomePage({ onAddItem, onOpenOutfit }: HomePageProps) {
   const { name } = useUserName();
   const { weather, isFallback: isWeatherFallback } = useWeather();
+  const [occasion, setOccasion] = React.useState<Occasion>(() => defaultOccasion());
   const {
     outfitOfTheDay,
     items,
@@ -540,7 +655,7 @@ export default function HomePage({ onAddItem, onOpenOutfit }: HomePageProps) {
     isRegenerating,
     error: outfitsError,
     regenerate,
-  } = useHomeOutfits(weather.temp);
+  } = useHomeOutfits(weather.temp, occasion);
 
   const userName = name?.trim() || "гость";
   const userInitial = userName.charAt(0).toUpperCase();
@@ -564,6 +679,10 @@ export default function HomePage({ onAddItem, onOpenOutfit }: HomePageProps) {
             <WeatherCard weather={weather} isFallback={isWeatherFallback} />
           </Reveal>
 
+          <Reveal delay={0.03}>
+            <SituationPicker value={occasion} onChange={setOccasion} />
+          </Reveal>
+
           {outfitsError ? (
             <p
               role="alert"
@@ -579,6 +698,7 @@ export default function HomePage({ onAddItem, onOpenOutfit }: HomePageProps) {
             ) : outfitOfTheDay ? (
               <OutfitOfTheDay
                 outfit={outfitOfTheDay}
+                situation={OCCASION_MAP[occasion].label}
                 isRegenerating={isRegenerating}
                 onRegenerate={regenerate}
                 onOpen={() => onOpenOutfit?.(outfitOfTheDay)}

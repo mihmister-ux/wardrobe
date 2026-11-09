@@ -13,13 +13,10 @@ import { cn } from "@/lib/utils";
  * (иначе браузер копит десятки мегабайт на длинной ленте).
  */
 function usePhotoUrl(photoId: string | undefined): string | null {
-  const [url, setUrl] = React.useState<string | null>(null);
+  const [loaded, setLoaded] = React.useState<{ id: string; url: string } | null>(null);
 
   React.useEffect(() => {
-    if (!photoId) {
-      setUrl(null);
-      return;
-    }
+    if (!photoId) return;
 
     let cancelled = false;
     let objectUrl: string | null = null;
@@ -29,7 +26,7 @@ function usePhotoUrl(photoId: string | undefined): string | null {
       .then((photo) => {
         if (cancelled || !photo) return;
         objectUrl = URL.createObjectURL(photo.thumb);
-        setUrl(objectUrl);
+        setLoaded({ id: photoId, url: objectUrl });
       })
       .catch(() => {
         // Нет фото — покажем эмодзи слота, вещь останется в списке.
@@ -38,10 +35,12 @@ function usePhotoUrl(photoId: string | undefined): string | null {
     return () => {
       cancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
+      // Ссылка уже невалидна: не отдаём её следующему фото до загрузки нового.
+      setLoaded((current) => (current && current.id === photoId ? null : current));
     };
   }, [photoId]);
 
-  return url;
+  return loaded && loaded.id === photoId ? loaded.url : null;
 }
 
 export interface ItemPhotoProps {

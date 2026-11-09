@@ -4,13 +4,14 @@
  * Сборка вариантов образа из вещей в базе.
  *
  * Правила простые и детерминированные: набор слотов → подходящие по погоде
- * вещи → оценка палитры генератором → сортировка по баллу. «Другой образ»
- * просто берёт следующий вариант из отсортированного списка.
+ * вещи → комплексная оценка (палитра + погода + формальность) → сортировка
+ * по баллу. «Другой образ» просто берёт следующий вариант из списка.
  */
 
-import type { Item, Slot } from "@/db/types";
+import type { Item, Occasion, Slot } from "@/db/types";
 import { assessPalette, type HarmonyId, type PalettePiece } from "@/generator/colors";
 import { itemName, itemTypeLabel, SLOT_EMOJI } from "@/features/items/itemView";
+import { scoreOutfit } from "@/features/home/scoreOutfit";
 import type { Outfit as UiOutfit } from "@/features/home/HomePage";
 
 /** Сколько вариантов держим в памяти под кнопку «другой образ». */
@@ -73,12 +74,15 @@ export interface BuildOutfitsOptions {
   items: readonly Item[];
   /** Текущая температура: по ней отбираются вещи и подпись «сезон». */
   temperature: number;
+  /** Куда собираемся: задаёт целевую формальность в оценке. */
+  occasion: Occasion;
   limit?: number;
 }
 
 export function buildOutfits({
   items,
   temperature,
+  occasion,
   limit = MAX_VARIANTS,
 }: BuildOutfitsOptions): UiOutfit[] {
   const available = items.filter((item) => item.status === "available");
@@ -140,6 +144,7 @@ export function buildOutfits({
       color: { family: item.color.family, hex: item.color.hex, label: item.color.label },
     }));
     const assessment = assessPalette(pieces);
+    const score = scoreOutfit(picked, assessment.score, temperature, occasion);
 
     variants.set(signature, {
       id: `outfit-${signature}`,
@@ -150,7 +155,8 @@ export function buildOutfits({
       note: assessment.detail,
       harmony: assessment.label,
       palette: [...new Set(picked.map((item) => item.color.hex))].slice(0, 4),
-      score: assessment.score,
+      score: score.total,
+      scoreParts: score,
       tags: [seasonLabel(temperature), `${tempText(temperature)}°`],
       items: picked.map((item) => ({
         id: item.id,
@@ -163,6 +169,11 @@ export function buildOutfits({
   }
 
   return [...variants.values()]
-    .sort((left, right) => right.score - left.score || left.id.localeCompare(right.id))
+    .sort(
+      (left, right) =>
+        right.score - left.score ||
+        right.scoreParts.color - left.scoreParts.color ||
+        left.id.localeCompare(right.id),
+    )
     .slice(0, limit);
 }

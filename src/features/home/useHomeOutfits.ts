@@ -4,7 +4,7 @@ import * as React from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 
 import { db } from "@/db/db";
-import type { Item } from "@/db/types";
+import type { Item, Occasion } from "@/db/types";
 import { buildOutfits } from "@/features/home/buildOutfits";
 import type { Outfit as UiOutfit } from "@/features/home/HomePage";
 
@@ -47,7 +47,7 @@ function newestFirst(items: readonly Item[]): Item[] {
   return [...items].sort((left, right) => right.createdAt - left.createdAt);
 }
 
-export function useHomeOutfits(temperature: number): HomeOutfits {
+export function useHomeOutfits(temperature: number, occasion: Occasion): HomeOutfits {
   const [rotation, setRotation] = React.useState(0);
   const [isRegenerating, setIsRegenerating] = React.useState(false);
   const [readError, setReadError] = React.useState<string | null>(null);
@@ -60,10 +60,13 @@ export function useHomeOutfits(temperature: number): HomeOutfits {
     [read],
   );
 
-  // Варианты уже отсортированы по баллу палитры: первый — самый удачный.
+  // Варианты уже отсортированы по комплексной оценке: первый — самый уместный.
   const outfits = React.useMemo(
-    () => (read?.items ? buildOutfits({ items: read.items, temperature }) : []),
-    [read, temperature],
+    () =>
+      read?.items
+        ? buildOutfits({ items: read.items, temperature, occasion })
+        : [],
+    [read, temperature, occasion],
   );
 
   const outfitOfTheDay =

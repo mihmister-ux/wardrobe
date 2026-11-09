@@ -1,27 +1,29 @@
 "use client";
 
-import { motion, useReducedMotion, type HTMLMotionProps } from "framer-motion";
+import * as React from "react";
 
-export interface RevealProps extends HTMLMotionProps<"div"> {
+import { cn } from "@/lib/utils";
+
+export interface RevealProps extends React.HTMLAttributes<HTMLDivElement> {
   /** Задержка появления, сек: для лесенки карточек. */
   delay?: number;
 }
 
 /**
- * Появление карточки: лёгкий подъём и проявление. При `prefers-reduced-motion`
- * сразу показывает контент без анимации.
+ * Появление карточки: лёгкий подъём и проявление.
+ *
+ * Это обычная CSS-анимация, а не motion-библиотека: анимация нужна ровно в
+ * одном месте (главный экран), а framer-motion весил больше, чем весь
+ * остальной код страницы. `prefers-reduced-motion` учтён в index.css.
  */
-export function Reveal({ delay = 0, children, ...rest }: RevealProps) {
-  const reduceMotion = useReducedMotion();
-
+export function Reveal({ delay = 0, className, style, children, ...rest }: RevealProps) {
   return (
-    <motion.div
-      initial={reduceMotion ? false : { opacity: 0, y: 14 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={reduceMotion ? { duration: 0 } : { duration: 0.35, delay, ease: [0.22, 1, 0.36, 1] }}
+    <div
+      className={cn("animate-reveal", className)}
+      style={{ animationDelay: `${delay}s`, ...style }}
       {...rest}
     >
       {children}
-    </motion.div>
+    </div>
   );
 }
