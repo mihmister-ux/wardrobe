@@ -21,7 +21,6 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { BottomDock, DockSpacer } from "@/components/layout/BottomDock";
 import { useUserName } from "@/features/settings/useUserName";
 import { useHomeOutfits } from "@/features/home/useHomeOutfits";
 import { useWeather } from "@/features/home/useWeather";
@@ -535,51 +534,46 @@ export default function HomePage({ onAddItem, onOpenOutfit }: HomePageProps) {
   const todayLabel = formatToday();
 
   return (
-    <div className="min-h-dvh bg-background">
-      <div className="mx-auto w-full max-w-md px-4 pt-5">
-        <header className="mb-5 flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs text-muted-foreground">{todayLabel}</p>
-            <h1 className="text-xl font-semibold tracking-tight">Привет, {userName} 👋</h1>
-          </div>
-          <div className="grid size-10 place-items-center rounded-full bg-gradient-to-br from-amber-300 to-rose-300 text-sm font-semibold text-white shadow-sm">
-            {userInitial}
-          </div>
-        </header>
+    <>
+      <header className="mb-5 flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs text-muted-foreground">{todayLabel}</p>
+          <h1 className="text-xl font-semibold tracking-tight">Привет, {userName} 👋</h1>
+        </div>
+        <div className="grid size-10 place-items-center rounded-full bg-gradient-to-br from-amber-300 to-rose-300 text-sm font-semibold text-white shadow-sm">
+          {userInitial}
+        </div>
+      </header>
 
-        <main className="space-y-6">
-          <WeatherCard weather={weather} isFallback={isWeatherFallback} />
+      <main className="space-y-6">
+        <WeatherCard weather={weather} isFallback={isWeatherFallback} />
 
-          {outfitsError ? (
-            <p
-              role="alert"
-              className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-2.5 text-xs text-destructive"
-            >
-              Не удалось прочитать гардероб: {outfitsError}
-            </p>
-          ) : null}
+        {outfitsError ? (
+          <p
+            role="alert"
+            className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-2.5 text-xs text-destructive"
+          >
+            Не удалось прочитать гардероб: {outfitsError}
+          </p>
+        ) : null}
 
-          {isOutfitsLoading ? (
-            <OutfitSkeleton />
-          ) : outfitOfTheDay ? (
-            <OutfitOfTheDay
-              outfit={outfitOfTheDay}
-              isRegenerating={isRegenerating}
-              onRegenerate={regenerate}
-              onOpen={() => onOpenOutfit?.(outfitOfTheDay)}
-            />
-          ) : (
-            <EmptyOutfit onAddItem={onAddItem} />
-          )}
+        {isOutfitsLoading ? (
+          <OutfitSkeleton />
+        ) : outfitOfTheDay ? (
+          <OutfitOfTheDay
+            outfit={outfitOfTheDay}
+            isRegenerating={isRegenerating}
+            onRegenerate={regenerate}
+            onOpen={() => onOpenOutfit?.(outfitOfTheDay)}
+          />
+        ) : (
+          <EmptyOutfit onAddItem={onAddItem} />
+        )}
 
-          <AlternativesCarousel outfits={alternatives} onOpen={onOpenOutfit} />
-        </main>
-
-        <DockSpacer />
-      </div>
+        <AlternativesCarousel outfits={alternatives} onOpen={onOpenOutfit} />
+      </main>
 
       <AddItemFab onClick={onAddItem} />
-      <BottomDock />
-    </div>
+    </>
   );
 }

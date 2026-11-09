@@ -27,6 +27,38 @@ const SLOT_EMOJI: Record<Slot, string> = {
 
 const DEFAULT_STATUS: ItemStatus = "available";
 
+/* ── Сезон ──────────────────────────────────────────────────────────────
+ * По фото плотность ткани не определить, поэтому сезон спрашиваем явно
+ * и перекрываем им температурный диапазон из справочника типов.
+ * ─────────────────────────────────────────────────────────────────────── */
+
+type SeasonId = "summer" | "demi" | "winter";
+
+interface SeasonDef {
+  id: SeasonId;
+  label: string;
+  emoji: string;
+  tempMin: number;
+  tempMax: number;
+}
+
+const SEASONS: readonly SeasonDef[] = [
+  { id: "summer", label: "Лето", emoji: "☀️", tempMin: 15, tempMax: 35 },
+  { id: "demi", label: "Демисезон", emoji: "🍂", tempMin: -5, tempMax: 15 },
+  { id: "winter", label: "Зима", emoji: "❄️", tempMin: -20, tempMax: 5 },
+];
+
+const SEASON_MAP: Record<SeasonId, SeasonDef> = Object.fromEntries(
+  SEASONS.map((season) => [season.id, season]),
+) as Record<SeasonId, SeasonDef>;
+
+/** Минус типографский: −5 читается лучше, чем -5. */
+const formatTemp = (value: number): string =>
+  value < 0 ? `−${Math.abs(value)}` : String(value);
+
+const formatRange = (season: Pick<SeasonDef, "tempMin" | "tempMax">): string =>
+  `${formatTemp(season.tempMin)}…${formatTemp(season.tempMax)} °C`;
+
 // Сжатие WebP
 const MAX_DIMENSION = 800;
 const THUMB_DIMENSION = 160;
@@ -61,9 +93,9 @@ async function compressImage(file: File): Promise<CompressedImage> {
 
 export interface AddItemSheetProps { open: boolean; onOpenChange: (open: boolean) => void; onSaved?: (item: Item) => void; }
 
-interface FormState { photo: CompressedImage | null; previewUrl: string | null; typeId: string | null; color: ItemColor | null; label: string; isSaving: boolean; error: string | null; }
+interface FormState { photo: CompressedImage | null; previewUrl: string | null; typeId: string | null; season: SeasonId | null; color: ItemColor | null; label: string; isSaving: boolean; error: string | null; }
 
-const INITIAL: FormState = { photo: null, previewUrl: null, typeId: null, color: null, label: "", isSaving: false, error: null };
+const INITIAL: FormState = { photo: null, previewUrl: null, typeId: null, season: null, color: null, label: "", isSaving: false, error: null };
 
 export default function AddItemSheet({ open, onOpenChange, onSaved }: AddItemSheetProps) {
   const [form, setForm] = React.useState<FormState>(INITIAL);
@@ -84,13 +116,14 @@ export default function AddItemSheet({ open, onOpenChange, onSaved }: AddItemShe
     } catch (err) { setField("error", err instanceof Error ? err.message : "Ошибка фото"); }
   };
 
-  const canSave = form.photo !== null && form.typeId !== null && form.color !== null && !form.isSaving;
+  const canSave = form.photo !== null && form.typeId !== null && form.season !== null && form.color !== null && !form.isSaving;
 
   const handleSave = async () => {
-    if (!canSave || !form.photo || !form.typeId || !form.color) return;
+    if (!canSave || !form.photo || !form.typeId || !form.season || !form.color) return;
     const type = TYPE_MAP[form.typeId];
     const defaults = buildItemDefaults(form.typeId);
     if (!type || !defaults) return;
+    const season = SEASON_MAP[form.season];
     setForm((s) => ({ ...s, isSaving: true, error: null }));
     try {
       const now = Date.now();
@@ -103,7 +136,7 @@ export default function AddItemSheet({ open, onOpenChange, onSaved }: AddItemShe
         id: itemId, type: defaults.type, slot: defaults.slot,
         label: form.label.trim() || `${type.label} · ${form.color.label}`,
         color: form.color, pattern: PATTERNS[0].id, texture: defaults.texture,
-        warmth: defaults.warmth, tempMin: defaults.tempMin, tempMax: defaults.tempMax,
+        warmth: defaults.warmth, tempMin: season.tempMin, tempMax: season.tempMax,
         waterResistance: defaults.waterResistance, windproof: defaults.windproof,
         formality: defaults.formality, occasions: defaults.occasions,
         tags: [], status: DEFAULT_STATUS, favorite: false,
@@ -160,6 +193,33 @@ export default function AddItemSheet({ open, onOpenChange, onSaved }: AddItemShe
                 </div>
               </div>
             ))}
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Сезон</p>
+            <div className="grid grid-cols-3 gap-2">
+              {SEASONS.map((season) => {
+                const isSelected = form.season === season.id;
+                return (
+                  <button
+                    key={season.id}
+                    type="button"
+                    onClick={() => setField("season", season.id)}
+                    aria-pressed={isSelected}
+                    className={cn("flex flex-col items-center gap-0.5 rounded-2xl border px-1 py-2 text-xs transition", isSelected ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/40")}
+                  >
+                    <span className="text-lg leading-none" aria-hidden>{season.emoji}</span>
+                    <span className="font-medium leading-tight">{season.label}</span>
+                    <span className="text-[10px] leading-tight tabular-nums">{formatRange(season)}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {form.season
+                ? `В образы вещь попадёт при ${formatRange(SEASON_MAP[form.season])}.`
+                : "Выберите сезон: от него зависит, при какой погоде вещь попадёт в образ."}
+            </p>
           </div>
 
           <div className="space-y-2">

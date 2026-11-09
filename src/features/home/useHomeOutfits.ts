@@ -1,6 +1,8 @@
- "use client";
+"use client";
 
 import * as React from "react";
+import { useLiveQuery } from "dexie-react-hooks";
+
 import { db } from "@/db/db";
 import type { Item } from "@/db/types";
 import type { Outfit as UiOutfit } from "@/features/home/HomePage";
@@ -14,6 +16,11 @@ export interface HomeOutfits {
   regenerate: () => Promise<void>;
 }
 
+/** Сколько вещей попадает в образ дня. */
+const OUTFIT_SIZE = 4;
+
+const NO_ALTERNATIVES: UiOutfit[] = [];
+
 function slotEmoji(slot: Item["slot"]): string {
   switch (slot) {
     case "top": return "👕";
@@ -26,55 +33,82 @@ function slotEmoji(slot: Item["slot"]): string {
   }
 }
 
+/**
+ * Чтение вещей для образа. Ошибку не бросаем, а возвращаем результатом:
+ * `useLiveQuery` не умеет показывать баннер, а экран умеет.
+ */
+type ItemsRead = { items: Item[]; error: null } | { items: null; error: string };
+
+async function readItems(): Promise<ItemsRead> {
+  try {
+    // toCollection().filter() читает всю таблицу, поэтому Dexie подписывается
+    // на любое изменение items и перезапускает запрос сам.
+    const items = await db.items
+      .toCollection()
+      .filter((item) => item.status !== "archived")
+      .toArray();
+    return { items, error: null };
+  } catch (err) {
+    return { items: null, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/** Заглушка генератора: берём OUTFIT_SIZE вещей со сдвигом `rotation`. */
+function buildOutfit(items: Item[], rotation: number): UiOutfit {
+  const start = rotation % items.length;
+  const picked = Array.from(
+    { length: Math.min(OUTFIT_SIZE, items.length) },
+    (_, i) => items[(start + i) % items.length],
+  );
+
+  return {
+    id: "outfit-1",
+    title: "Ваш первый образ",
+    note: "Собран из реальных вещей в базе",
+    score: 85,
+    tags: ["Из базы"],
+    items: picked.map((item) => ({
+      id: item.id,
+      name: item.label || item.type,
+      category: item.slot as any,
+      emoji: slotEmoji(item.slot),
+    })),
+    gradient: "from-sky-200 via-indigo-200 to-violet-200",
+  };
+}
+
 export function useHomeOutfits(): HomeOutfits {
-  const [outfitOfTheDay, setOutfitOfTheDay] = React.useState<UiOutfit | null>(null);
-  const [alternatives, setAlternatives] = React.useState<UiOutfit[]>([]);
-  const [isLoading, setIsLoading] = React.useState(true);
+  const [rotation, setRotation] = React.useState(0);
   const [isRegenerating, setIsRegenerating] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
+  const [readError, setReadError] = React.useState<string | null>(null);
 
-  const run = React.useCallback(async (regenerateMode: boolean) => {
-    if (regenerateMode) setIsRegenerating(true);
-    else setIsLoading(true);
-    setError(null);
+  // Живой запрос: Dexie перезапускает его при добавлении, удалении и правке вещей.
+  const read = useLiveQuery<ItemsRead>(readItems, []);
 
+  const items = read?.items ?? null;
+  const outfitOfTheDay = React.useMemo(
+    () => (items && items.length > 0 ? buildOutfit(items, rotation) : null),
+    [items, rotation],
+  );
+
+  /** «Другой образ»: сдвигаем выборку и честно перечитываем базу. */
+  const regenerate = React.useCallback(async () => {
+    setRotation((value) => value + 1);
+    setIsRegenerating(true);
     try {
-      const items = await db.items.where("status").notEqual("archived").toArray();
-
-      if (items.length === 0) {
-        setOutfitOfTheDay(null);
-        setAlternatives([]);
-        return;
-      }
-
-      // Заглушка для первого теста (берем первые 4 вещи)
-      const fakeOutfit: UiOutfit = {
-        id: "outfit-1",
-        title: "Ваш первый образ",
-        note: "Собран из реальных вещей в базе",
-        score: 85,
-        tags: ["Из базы"],
-        items: items.slice(0, 4).map((item) => ({
-          id: item.id,
-          name: item.label || item.type,
-          category: item.slot as any,
-          emoji: slotEmoji(item.slot),
-        })),
-        gradient: "from-sky-200 via-indigo-200 to-violet-200",
-      };
-
-      setOutfitOfTheDay(fakeOutfit);
-      setAlternatives([]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      const fresh = await readItems();
+      setReadError(fresh.error);
     } finally {
-      setIsLoading(false);
       setIsRegenerating(false);
     }
   }, []);
 
-  React.useEffect(() => { void run(false); }, [run]);
-  const regenerate = React.useCallback(() => run(true), [run]);
-
-  return { outfitOfTheDay, alternatives, isLoading, isRegenerating, error, regenerate };
+  return {
+    outfitOfTheDay,
+    alternatives: NO_ALTERNATIVES,
+    isLoading: read === undefined,
+    isRegenerating,
+    error: read?.error ?? readError,
+    regenerate,
+  };
 }

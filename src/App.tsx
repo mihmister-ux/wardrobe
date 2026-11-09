@@ -1,6 +1,9 @@
+"use client";
+
 import { useState } from "react";
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 
+import AppLayout from "./components/layout/AppLayout";
 import AddItemSheet from "./features/items/AddItemSheet";
 import HomePage from "./features/home/HomePage";
 import OutfitsPage from "./features/outfits/OutfitsPage";
@@ -14,11 +17,13 @@ export default function App() {
   return (
     <HashRouter>
       <Routes>
-        <Route path="/" element={<HomePage onAddItem={openAddItem} />} />
-        <Route path="/wardrobe" element={<WardrobePage onAddItem={openAddItem} />} />
-        <Route path="/outfits" element={<OutfitsPage />} />
-        <Route path="/profile" element={<ProfilePage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route element={<AppLayout />}>
+          <Route path="/" element={<HomePage onAddItem={openAddItem} />} />
+          <Route path="/wardrobe" element={<WardrobePage onAddItem={openAddItem} />} />
+          <Route path="/outfits" element={<OutfitsPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
       </Routes>
 
       <AddItemSheet open={isAddItemOpen} onOpenChange={setAddItemOpen} />
