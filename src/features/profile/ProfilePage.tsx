@@ -26,6 +26,7 @@ import { ImportBackupDialog } from "@/features/backup/ImportBackupDialog";
 import { itemsCountLabel } from "@/features/items/itemView";
 import { useUserName } from "@/features/settings/useUserName";
 import { cn } from "@/lib/utils";
+import { BulkUpload } from "@/components/BulkUpload"; // Исправлен путь под алиасы
 
 interface BackupStats {
   items: number;
@@ -324,8 +325,6 @@ export default function ProfilePage() {
             aria-label="Файл резервной копии"
             onChange={(event) => {
               const file = event.target.files?.[0];
-              // Сбрасываем значение: иначе повторный выбор того же файла
-              // не вызовет change и диалог не откроется.
               event.target.value = "";
               void handleFile(file);
             }}
@@ -355,6 +354,10 @@ export default function ProfilePage() {
             сейчас в гардеробе, данными из файла.
           </p>
         </section>
+
+        {/* НАШ БЛОК ПАКЕТНОЙ ЗАГРУЗКИ */}
+        <BulkUpload />
+        
       </main>
 
       {draft ? (
