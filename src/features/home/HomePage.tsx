@@ -95,7 +95,7 @@ function formatToday(date = new Date()): string {
 }
 
 const CATEGORY_LABEL: Record<ItemCategory, string> = {
-  outerwear: "верхний слой",
+  outerwear: "Верхняя одежда",
   top: "верх",
   bottom: "низ",
   fullbody: "цельный образ",
@@ -224,7 +224,15 @@ function Stat({
 /*  1. Погода                                                                 */
 /* ========================================================================== */
 
-function WeatherCard({ weather, isFallback = false }: { weather: Weather; isFallback?: boolean }) {
+function WeatherCard({
+  weather,
+  isFallback = false,
+  error = null,
+}: {
+  weather: Weather;
+  isFallback?: boolean;
+  error?: string | null;
+}) {
   const Icon = WEATHER_ICON[weather.kind];
   const temp = weather.temp > 0 ? `+${weather.temp}` : String(weather.temp);
 
@@ -234,16 +242,28 @@ function WeatherCard({ weather, isFallback = false }: { weather: Weather; isFall
       className="overflow-hidden rounded-3xl border border-border/60 bg-card shadow-sm"
     >
       <div className="flex items-start justify-between gap-4 p-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
-            <MapPin className="size-3.5" />
-            {weather.city}
+        <div className="min-w-0 space-y-1">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5 text-xs font-medium text-muted-foreground">
+            <MapPin className="size-3.5 shrink-0" />
+            <span className="shrink-0">Ваш город</span>
+            <span className="truncate text-foreground">{weather.city}</span>
+            <Link
+              to="/profile"
+              className="ml-1 shrink-0 text-[11px] font-medium text-primary hover:underline"
+            >
+              Изменить
+            </Link>
           </div>
-          <div className="flex items-baseline gap-2">
+          <div className="flex flex-wrap items-baseline gap-2">
             <span className="text-4xl font-semibold leading-none tracking-tight tabular-nums">
               {temp}°
             </span>
             <span className="text-sm text-muted-foreground">{weather.condition}</span>
+            {isFallback ? (
+              <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+                нет данных
+              </span>
+            ) : null}
           </div>
           <p className="text-xs text-muted-foreground">
             ощущается как {weather.feelsLike}° · {weather.low}…{weather.high}°
@@ -263,7 +283,8 @@ function WeatherCard({ weather, isFallback = false }: { weather: Weather; isFall
         <p>{weatherHint(weather)}</p>
         {isFallback ? (
           <p className="text-xs">
-            Показана погода по умолчанию: разрешите геолокацию, чтобы видеть свою.
+            {error ??
+              "Показана погода по умолчанию: укажите город в профиле или разрешите геолокацию."}
           </p>
         ) : null}
       </div>
@@ -646,7 +667,8 @@ export interface HomePageProps {
 
 export default function HomePage({ onAddItem, onOpenOutfit }: HomePageProps) {
   const { name } = useUserName();
-  const { weather, isFallback: isWeatherFallback } = useWeather();
+  const { weather, isFallback: isWeatherFallback, error: weatherError } =
+    useWeather();
   const [occasion, setOccasion] = React.useState<Occasion>(() => defaultOccasion());
   const {
     outfitOfTheDay,
@@ -676,7 +698,11 @@ export default function HomePage({ onAddItem, onOpenOutfit }: HomePageProps) {
       <main className="space-y-6 lg:grid lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)] lg:items-start lg:gap-6 lg:space-y-0">
         <div className="space-y-6">
           <Reveal>
-            <WeatherCard weather={weather} isFallback={isWeatherFallback} />
+            <WeatherCard
+              weather={weather}
+              isFallback={isWeatherFallback}
+              error={weatherError}
+            />
           </Reveal>
 
           <Reveal delay={0.03}>

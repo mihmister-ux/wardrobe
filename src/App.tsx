@@ -6,6 +6,7 @@ import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import AppLayout from "./components/layout/AppLayout";
 import AddItemSheet from "./features/items/AddItemSheet";
 import HomePage from "./features/home/HomePage";
+import { useTheme } from "./features/settings/useTheme";
 
 /**
  * Главная остаётся в стартовом чанке — на неё приходят первой. Остальные
@@ -19,6 +20,9 @@ const ProfilePage = lazy(() => import("./features/profile/ProfilePage"));
 export default function App() {
   const [isAddItemOpen, setAddItemOpen] = useState(false);
   const openAddItem = () => setAddItemOpen(true);
+
+  // Светлая / тёмная / системная — применяется один раз на всё приложение.
+  useTheme();
 
   return (
     <HashRouter>

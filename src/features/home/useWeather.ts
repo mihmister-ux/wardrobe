@@ -2,9 +2,10 @@
 
 import * as React from "react";
 import type { Weather, WeatherKind } from "@/features/home/HomePage";
+import { useSettings } from "@/features/settings/useSettings";
 
 /* ========================================================================== */
-/*  Заглушка: показывается, если нет геолокации или API не ответил            */
+/*  Заглушка: показывается, если город не задан, нет геолокации или API молчит */
 /* ========================================================================== */
 
 const FALLBACK_WEATHER: Weather = {
@@ -92,7 +93,7 @@ function describeCode(code: number): { kind: WeatherKind; condition: string } {
 
 /**
  * Координаты пользователя или null, если браузер не дал доступ.
- * TODO: Добавить ручной выбор города, чтобы мы знали, что это надо доработать позже.
+ * Используются, только когда город не указан в настройках.
  */
 function getCoords(): Promise<Coords | null> {
   if (typeof navigator === "undefined" || !navigator.geolocation) {
@@ -123,13 +124,17 @@ function getCoords(): Promise<Coords | null> {
         clearTimeout(timer);
         finish(null);
       },
-      { enableHighAccuracy: false, timeout: GEO_TIMEOUT_MS, maximumAge: 10 * 60 * 1000 },
+      {
+        enableHighAccuracy: false,
+        timeout: GEO_TIMEOUT_MS,
+        maximumAge: 10 * 60 * 1000,
+      },
     );
   });
 }
 
 /* ========================================================================== */
-/*  Open-Meteo                                                                */
+/*  Open-Meteo: погода и геокодинг                                            */
 /* ========================================================================== */
 
 interface OpenMeteoResponse {
@@ -146,11 +151,22 @@ interface OpenMeteoResponse {
   };
 }
 
+interface GeocodeResult {
+  latitude: number;
+  longitude: number;
+  name: string;
+  country?: string;
+  admin1?: string;
+}
+
 function round(value: number, fallback: number): number {
   return Number.isFinite(value) ? Math.round(value) : fallback;
 }
 
-async function fetchWeather(coords: Coords, signal: AbortSignal): Promise<Weather> {
+async function fetchWeather(
+  coords: Coords,
+  signal: AbortSignal,
+): Promise<Weather> {
   const params = new URLSearchParams({
     latitude: coords.latitude.toFixed(4),
     longitude: coords.longitude.toFixed(4),
@@ -162,7 +178,9 @@ async function fetchWeather(coords: Coords, signal: AbortSignal): Promise<Weathe
     forecast_days: "1",
   });
 
-  const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, { signal });
+  const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, {
+    signal,
+  });
   if (!response.ok) throw new Error(`Open-Meteo ответил ${response.status}`);
 
   const data = (await response.json()) as OpenMeteoResponse;
@@ -187,8 +205,38 @@ async function fetchWeather(coords: Coords, signal: AbortSignal): Promise<Weathe
   };
 }
 
+/**
+ * Город → координаты. Open-Meteo Geocoding понимает «Казань», «Kazan»
+ * и опечатки в разумных пределах; пустой ответ — город не найден.
+ */
+async function geocodeCity(
+  name: string,
+  signal: AbortSignal,
+): Promise<GeocodeResult | null> {
+  const params = new URLSearchParams({
+    name,
+    count: "1",
+    language: "ru",
+    format: "json",
+  });
+
+  const response = await fetch(
+    `https://geocoding-api.open-meteo.com/v1/search?${params}`,
+    { signal },
+  );
+  if (!response.ok) {
+    throw new Error(`Поиск города: Open-Meteo ответил ${response.status}`);
+  }
+
+  const data = (await response.json()) as { results?: GeocodeResult[] };
+  return data.results?.[0] ?? null;
+}
+
 /** Название города по координатам. Не критично: без него останется «Мой город». */
-async function fetchCityName(coords: Coords, signal: AbortSignal): Promise<string | null> {
+async function fetchCityName(
+  coords: Coords,
+  signal: AbortSignal,
+): Promise<string | null> {
   try {
     const params = new URLSearchParams({
       latitude: coords.latitude.toFixed(4),
@@ -216,65 +264,111 @@ async function fetchCityName(coords: Coords, signal: AbortSignal): Promise<strin
 /*  Хук                                                                       */
 /* ========================================================================== */
 
+export type WeatherSource = "manual" | "geo" | "fallback";
+
 export interface UseWeatherResult {
   /** Всегда валидный объект: реальные данные или заглушка «Москва +7°». */
   weather: Weather;
   isLoading: boolean;
   isFallback: boolean;
+  /** Откуда взялась погода: свой город, геолокация или заглушка. */
+  source: WeatherSource;
   error: string | null;
   refetch: () => void;
 }
 
 export function useWeather(): UseWeatherResult {
+  const { city: manualCity, isLoading: isSettingsLoading } = useSettings();
+
   const [weather, setWeather] = React.useState<Weather>(FALLBACK_WEATHER);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isFallback, setIsFallback] = React.useState(true);
+  const [source, setSource] = React.useState<WeatherSource>("fallback");
   const [error, setError] = React.useState<string | null>(null);
   const [attempt, setAttempt] = React.useState(0);
 
   const refetch = React.useCallback(() => setAttempt((value) => value + 1), []);
 
   React.useEffect(() => {
+    // Ждём настройки: иначе на долю секунды покажем погоду не того города.
+    if (isSettingsLoading) return;
+
     const controller = new AbortController();
     let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
-    const fallback = (reason: string | null) => {
+    const fail = (message: string) => {
       if (cancelled) return;
-      setWeather(FALLBACK_WEATHER);
+      setWeather({
+        ...FALLBACK_WEATHER,
+        ...(manualCity ? { city: manualCity } : {}),
+      });
       setIsFallback(true);
-      setError(reason);
+      setSource("fallback");
+      setError(message);
+      setIsLoading(false);
     };
 
-    (async () => {
+    void (async () => {
       setIsLoading(true);
       setError(null);
-
-      const coords = await getCoords();
-      if (cancelled) return;
-
-      if (!coords) {
-        fallback("Геолокация недоступна");
-        setIsLoading(false);
-        return;
-      }
-
-      const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+      // Один таймаут на геокодинг и на прогноз: город не должен «висеть».
+      timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
       try {
-        const [data, city] = await Promise.all([
-          fetchWeather(coords, controller.signal),
-          fetchCityName(coords, controller.signal),
-        ]);
+        let coords: Coords;
+        let label: string | null = null;
+
+        if (manualCity) {
+          const place = await geocodeCity(manualCity, controller.signal);
+          if (cancelled) return;
+          if (!place) {
+            fail(
+              `Не нашли город «${manualCity}». Проверьте название в профиле.`,
+            );
+            return;
+          }
+          coords = { latitude: place.latitude, longitude: place.longitude };
+          label = place.name;
+        } else {
+          const geo = await getCoords();
+          if (cancelled) return;
+          if (!geo) {
+            fail(
+              "Геолокация недоступна. Укажите город в профиле — погода будет точнее.",
+            );
+            return;
+          }
+          coords = geo;
+        }
+
+        const data = await fetchWeather(coords, controller.signal);
         if (cancelled) return;
 
-        setWeather(city ? { ...data, city } : data);
+        if (manualCity) {
+          setWeather({ ...data, city: label ?? manualCity });
+          setSource("manual");
+        } else {
+          const city = await fetchCityName(coords, controller.signal);
+          if (cancelled) return;
+          setWeather(city ? { ...data, city } : data);
+          setSource("geo");
+        }
+
         setIsFallback(false);
         setError(null);
       } catch (err) {
         if (cancelled) return;
-        fallback(err instanceof Error ? err.message : String(err));
+        const message = controller.signal.aborted
+          ? "Сервис погоды не ответил за 8 секунд. Попробуйте ещё раз."
+          : err instanceof TypeError
+            ? "Нет связи с сервисом погоды. Проверьте интернет."
+            : err instanceof Error
+              ? err.message
+              : String(err);
+        fail(message);
       } finally {
-        clearTimeout(timer);
+        if (timer) clearTimeout(timer);
         if (!cancelled) setIsLoading(false);
       }
     })();
@@ -282,8 +376,9 @@ export function useWeather(): UseWeatherResult {
     return () => {
       cancelled = true;
       controller.abort();
+      if (timer) clearTimeout(timer);
     };
-  }, [attempt]);
+  }, [attempt, isSettingsLoading, manualCity]);
 
-  return { weather, isLoading, isFallback, error, refetch };
+  return { weather, isLoading, isFallback, source, error, refetch };
 }

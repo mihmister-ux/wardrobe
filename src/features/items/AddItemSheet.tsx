@@ -237,7 +237,7 @@ export default function AddItemSheet({ open, onOpenChange, onSaved }: AddItemShe
                 />
                 <PhotoSourceButton
                   icon={ImagePlus}
-                  title="Из галереи"
+                  title="Галерея"
                   hint="выбрать файл"
                   onClick={() => galleryRef.current?.click()}
                 />
@@ -252,7 +252,7 @@ export default function AddItemSheet({ open, onOpenChange, onSaved }: AddItemShe
                 <p className="text-xs font-medium text-muted-foreground">{slot.label}</p>
                 <div className="grid grid-cols-3 gap-2">
                   {TYPES_BY_SLOT[slot.id].map((type) => (
-                    <button key={type.id} type="button" onClick={() => setField("typeId", type.id)} className={cn("flex flex-col items-center gap-1 rounded-2xl border p-2 text-xs transition", form.typeId === type.id ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground")}>
+                    <button key={type.id} type="button" aria-label={type.label} onClick={() => setField("typeId", type.id)} className={cn("flex flex-col items-center gap-1 rounded-2xl border p-2 text-xs transition", form.typeId === type.id ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground")}>
                       <span className="text-2xl">{SLOT_EMOJI[type.slot]}</span>
                       <span className="text-center leading-tight">{type.label}</span>
                     </button>
@@ -272,6 +272,7 @@ export default function AddItemSheet({ open, onOpenChange, onSaved }: AddItemShe
                     key={season.id}
                     type="button"
                     onClick={() => setField("season", season.id)}
+                    aria-label={`${season.label}, ${formatRange(season)}`}
                     aria-pressed={isSelected}
                     className={cn("flex flex-col items-center gap-0.5 rounded-2xl border px-1 py-2 text-xs transition", isSelected ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/40")}
                   >
@@ -351,6 +352,7 @@ function PhotoSourceButton({
     <button
       type="button"
       onClick={onClick}
+      aria-label={`${title}: ${hint}`}
       className="flex aspect-square flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-border px-2 text-muted-foreground transition hover:border-primary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <Icon className="size-7" />

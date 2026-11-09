@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { EyeOff, MoreVertical, RotateCcw, Trash2 } from "lucide-react";
+import { Check, EyeOff, MoreVertical, RotateCcw, Trash2 } from "lucide-react";
 
 import type { Item } from "@/db/types";
 import { itemName, itemTypeLabel } from "@/features/items/itemView";
@@ -12,20 +12,30 @@ export interface ItemCardProps {
   item: Item;
   isMenuOpen: boolean;
   isBusy: boolean;
+  /** Режим массового выбора: клик отмечает вещь, а не открывает форму. */
+  selectionMode?: boolean;
+  isSelected?: boolean;
   onMenuOpenChange: (open: boolean) => void;
+  onEdit: () => void;
+  onToggleSelect?: () => void;
   onArchiveToggle: () => void;
   onRequestDelete: () => void;
 }
 
 /**
- * Карточка вещи: фото, название, тип и меню с двумя действиями.
- * Убранная вещь остаётся в сетке, но приглушена и помечена «Убрано».
+ * Карточка вещи: фото на мягкой нейтральной подложке, название, тип и меню.
+ * Светлая подложка карточки и белое «окно» фотографии отделяют вещь от фона,
+ * а размытая тень заставляет её парить над страницей.
  */
 export function ItemCard({
   item,
   isMenuOpen,
   isBusy,
+  selectionMode = false,
+  isSelected = false,
   onMenuOpenChange,
+  onEdit,
+  onToggleSelect,
   onArchiveToggle,
   onRequestDelete,
 }: ItemCardProps) {
@@ -42,42 +52,88 @@ export function ItemCard({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isMenuOpen, onMenuOpenChange]);
 
+  const name = itemName(item);
+  const actionHint = selectionMode
+    ? `${isSelected ? "Снять выделение с" : "Выделить"} «${name}»`
+    : `Изменить вещь «${name}»`;
+  const checkboxHint = isSelected
+    ? `Снять отметку с «${name}»`
+    : `Отметить «${name}»`;
+
   return (
     <article
       className={cn(
-        "relative flex flex-col overflow-visible rounded-3xl border border-border/60 bg-card shadow-sm transition",
+        "group relative flex flex-col rounded-3xl bg-slate-100 p-2.5 transition-[box-shadow,transform] duration-300 dark:bg-slate-800",
+        isSelected
+          ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
+          : "shadow-[0_18px_40px_-30px_rgba(15,23,42,0.55)] hover:-translate-y-0.5 hover:shadow-[0_26px_48px_-28px_rgba(15,23,42,0.45)] dark:shadow-[0_18px_40px_-26px_rgba(0,0,0,0.9)] dark:hover:shadow-[0_26px_48px_-24px_rgba(0,0,0,0.95)]",
         isBusy && "opacity-60",
       )}
     >
-      <div className="relative aspect-square overflow-hidden rounded-t-3xl bg-gradient-to-br from-muted to-secondary/70">
-        <ItemPhoto item={item} dimmed={isArchived} />
-
-        {isArchived ? (
-          <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-background/90 px-2 py-0.5 text-xs font-medium text-muted-foreground backdrop-blur">
-            <EyeOff className="size-3" />
-            Убрано
-          </span>
-        ) : null}
-      </div>
-
-      <div className="flex flex-1 flex-col gap-0.5 px-3 py-2.5">
-        <p className="truncate text-sm font-medium leading-snug">{itemName(item)}</p>
-        <p className="truncate text-xs text-muted-foreground">
-          {itemTypeLabel(item)} · {item.color.label}
-        </p>
-      </div>
-
       <button
         type="button"
-        aria-label={`Действия с вещью «${itemName(item)}»`}
-        aria-haspopup="menu"
-        aria-expanded={isMenuOpen}
-        aria-controls={isMenuOpen ? menuId : undefined}
-        onClick={() => onMenuOpenChange(!isMenuOpen)}
-        className="absolute right-2 top-2 grid size-8 place-items-center rounded-full bg-background/85 text-foreground shadow-sm backdrop-blur transition hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-95"
+        onClick={selectionMode ? onToggleSelect : onEdit}
+        aria-label={actionHint}
+        aria-pressed={selectionMode ? isSelected : undefined}
+        className="flex flex-1 flex-col text-left focus-visible:outline-none"
       >
-        <MoreVertical className="size-4" />
+        {/* «Окно» фотографии: независимая подложка + своя тень. */}
+        <span className="relative block overflow-hidden rounded-2xl bg-white shadow-[0_20px_35px_-22px_rgba(15,23,42,0.5)] transition-transform duration-500 ease-out group-hover:-translate-y-1 dark:bg-slate-900 dark:shadow-[0_20px_35px_-20px_rgba(0,0,0,0.9)]">
+          <span className="block aspect-square">
+            <ItemPhoto
+              item={item}
+              dimmed={isArchived}
+              className="drop-shadow-[0_18px_14px_rgba(15,23,42,0.25)] transition-transform duration-700 ease-out group-hover:scale-[1.05] dark:drop-shadow-[0_18px_14px_rgba(0,0,0,0.65)]"
+            />
+          </span>
+        </span>
+
+        <span className="block px-1 pb-1 pt-2.5">
+          <span className="block truncate text-sm font-medium leading-snug">
+            {name}
+          </span>
+          <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+            {itemTypeLabel(item)} · {item.color.label}
+          </span>
+        </span>
       </button>
+
+      {isArchived && !selectionMode ? (
+        <span className="pointer-events-none absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-background/90 px-2 py-0.5 text-[11px] font-medium text-muted-foreground shadow-sm backdrop-blur">
+          <EyeOff className="size-3" />
+          Убрано
+        </span>
+      ) : null}
+
+      {selectionMode ? (
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={isSelected}
+          aria-label={checkboxHint}
+          onClick={onToggleSelect}
+          className={cn(
+            "absolute left-3 top-3 z-10 grid size-7 place-items-center rounded-full border-2 shadow-sm backdrop-blur transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            isSelected
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-white/80 bg-background/80 text-transparent hover:border-primary",
+          )}
+        >
+          <Check className="size-4" strokeWidth={3} />
+        </button>
+      ) : (
+        <button
+          type="button"
+          aria-label={`Действия с вещью «${name}»`}
+          aria-haspopup="menu"
+          aria-expanded={isMenuOpen}
+          aria-controls={isMenuOpen ? menuId : undefined}
+          onClick={() => onMenuOpenChange(!isMenuOpen)}
+          className="absolute right-3 top-3 z-30 grid size-8 place-items-center rounded-full bg-background/85 text-foreground shadow-sm backdrop-blur transition hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-95"
+        >
+          <MoreVertical className="size-4" />
+        </button>
+      )}
 
       {isMenuOpen ? (
         <>
@@ -93,9 +149,21 @@ export function ItemCard({
           <div
             id={menuId}
             role="menu"
-            aria-label={`Действия: ${itemName(item)}`}
-            className="absolute right-2 top-11 z-30 w-52 overflow-hidden rounded-2xl border border-border bg-card p-1 shadow-xl"
+            aria-label={`Действия: ${name}`}
+            className="absolute right-2 top-12 z-30 w-52 overflow-hidden rounded-2xl border border-border bg-card p-1 shadow-xl"
           >
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                onMenuOpenChange(false);
+                onEdit();
+              }}
+              className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-sm transition hover:bg-secondary focus-visible:bg-secondary focus-visible:outline-none"
+            >
+              Изменить
+            </button>
+
             <button
               type="button"
               role="menuitem"
@@ -103,9 +171,13 @@ export function ItemCard({
                 onMenuOpenChange(false);
                 onArchiveToggle();
               }}
-              className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-sm transition hover:bg-secondary focus-visible:outline-none focus-visible:bg-secondary"
+              className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-sm transition hover:bg-secondary focus-visible:bg-secondary focus-visible:outline-none"
             >
-              {isArchived ? <RotateCcw className="size-4" /> : <EyeOff className="size-4" />}
+              {isArchived ? (
+                <RotateCcw className="size-4" />
+              ) : (
+                <EyeOff className="size-4" />
+              )}
               {isArchived ? "Вернуть в образы" : "Убрать из образов"}
             </button>
 
@@ -116,7 +188,7 @@ export function ItemCard({
                 onMenuOpenChange(false);
                 onRequestDelete();
               }}
-              className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-sm text-destructive transition hover:bg-destructive/10 focus-visible:outline-none focus-visible:bg-destructive/10"
+              className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-sm text-destructive transition hover:bg-destructive/10 focus-visible:bg-destructive/10 focus-visible:outline-none"
             >
               <Trash2 className="size-4" />
               Удалить навсегда

@@ -8,7 +8,12 @@ import {
   Database,
   Download,
   Loader2,
+  MapPin,
+  Monitor,
+  Moon,
+  Palette,
   Pencil,
+  Sun,
   Upload,
 } from "lucide-react";
 
@@ -24,6 +29,11 @@ import {
 } from "@/features/backup/backup";
 import { ImportBackupDialog } from "@/features/backup/ImportBackupDialog";
 import { itemsCountLabel } from "@/features/items/itemView";
+import {
+  normalizeTheme,
+  useSettings,
+  type ThemeMode,
+} from "@/features/settings/useSettings";
 import { useUserName } from "@/features/settings/useUserName";
 import { cn } from "@/lib/utils";
 import { BulkUpload } from "@/components/BulkUpload"; // Исправлен путь под алиасы
@@ -48,6 +58,16 @@ async function readBackupStats(): Promise<BackupStats> {
 }
 
 type Notice = { kind: "success" | "error"; text: string };
+
+const THEME_OPTIONS: ReadonlyArray<{
+  id: ThemeMode;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+}> = [
+  { id: "light", label: "Светлая", icon: Sun },
+  { id: "dark", label: "Тёмная", icon: Moon },
+  { id: "system", label: "Системная", icon: Monitor },
+];
 
 export default function ProfilePage() {
   const { name, isLoading: isNameLoading, saveName } = useUserName();
@@ -82,6 +102,54 @@ export default function ProfilePage() {
       setNameError(err instanceof Error ? err.message : "Не удалось сохранить имя");
     } finally {
       setSavingName(false);
+    }
+  };
+
+  /* ------------------------------ город ------------------------------ */
+
+  const { settings, isLoading: isSettingsLoading, save } = useSettings();
+  const theme = normalizeTheme(settings?.theme);
+
+  const cityInputRef = React.useRef<HTMLInputElement>(null);
+  const [isSavingCity, setSavingCity] = React.useState(false);
+  const [cityError, setCityError] = React.useState<string | null>(null);
+  const [cityNotice, setCityNotice] = React.useState<string | null>(null);
+  const [themeError, setThemeError] = React.useState<string | null>(null);
+
+  const submitCity = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const value = cityInputRef.current?.value.trim() ?? "";
+    if (value.length > 80) {
+      setCityError("Название города длиннее 80 символов — сократите.");
+      return;
+    }
+    setSavingCity(true);
+    setCityError(null);
+    setCityNotice(null);
+    try {
+      await save({ city: value });
+      setCityNotice(
+        value
+          ? `Город сохранён: ${value}. Погода на главной обновится.`
+          : "Город очищен — снова используется геолокация.",
+      );
+    } catch (err) {
+      setCityError(
+        err instanceof Error ? err.message : "Не удалось сохранить город",
+      );
+    } finally {
+      setSavingCity(false);
+    }
+  };
+
+  const changeTheme = async (next: ThemeMode) => {
+    setThemeError(null);
+    try {
+      await save({ theme: next });
+    } catch (err) {
+      setThemeError(
+        err instanceof Error ? err.message : "Не удалось сменить тему",
+      );
     }
   };
 
@@ -252,6 +320,134 @@ export default function ProfilePage() {
           </div>
         </section>
 
+        <div className="grid gap-4 sm:grid-cols-2">
+          <section
+            aria-labelledby="city-title"
+            className="flex flex-col rounded-3xl border border-border/60 bg-card p-4 shadow-sm"
+          >
+            <div className="flex items-start gap-3">
+              <div className="grid size-10 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary">
+                <MapPin className="size-5" />
+              </div>
+              <div className="min-w-0">
+                <h2 id="city-title" className="text-base font-semibold">
+                  Ваш город
+                </h2>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  Погода и образ дня подстраиваются под него. Пусто — определим
+                  по геолокации.
+                </p>
+              </div>
+            </div>
+
+            {isSettingsLoading ? (
+              <div className="mt-3 h-10 animate-pulse rounded-xl bg-muted" />
+            ) : (
+              <form
+                onSubmit={(event) => void submitCity(event)}
+                className="mt-3 space-y-2"
+              >
+                <label htmlFor="city-input" className="sr-only">
+                  Город
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    // key заставляет поле перечитать значение после импорта базы.
+                    key={settings?.city ?? ""}
+                    ref={cityInputRef}
+                    id="city-input"
+                    defaultValue={settings?.city ?? ""}
+                    placeholder="Например, Казань"
+                    maxLength={80}
+                    autoComplete="address-level2"
+                    onChange={() => {
+                      setCityError(null);
+                      setCityNotice(null);
+                    }}
+                    className="h-10 min-w-0 flex-1 rounded-xl border border-border bg-transparent px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  />
+                  <Button
+                    type="submit"
+                    className="shrink-0 rounded-xl"
+                    disabled={isSavingCity}
+                  >
+                    {isSavingCity ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      "Сохранить"
+                    )}
+                  </Button>
+                </div>
+                {cityError ? (
+                  <p role="alert" className="text-xs text-destructive">
+                    {cityError}
+                  </p>
+                ) : null}
+                {cityNotice ? (
+                  <p
+                    role="status"
+                    className="text-xs text-emerald-700 dark:text-emerald-300"
+                  >
+                    {cityNotice}
+                  </p>
+                ) : null}
+              </form>
+            )}
+          </section>
+
+          <section
+            aria-labelledby="theme-title"
+            className="flex flex-col rounded-3xl border border-border/60 bg-card p-4 shadow-sm"
+          >
+            <div className="flex items-start gap-3">
+              <div className="grid size-10 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary">
+                <Palette className="size-5" />
+              </div>
+              <div className="min-w-0">
+                <h2 id="theme-title" className="text-base font-semibold">
+                  Оформление
+                </h2>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  Светлая, тёмная или как в системе.
+                </p>
+              </div>
+            </div>
+
+            <div
+              role="group"
+              aria-label="Тема оформления"
+              className="mt-3 grid grid-cols-3 gap-1 rounded-2xl bg-muted/60 p-1"
+            >
+              {THEME_OPTIONS.map(({ id, label, icon: Icon }) => {
+                const isActive = theme === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    aria-pressed={isActive}
+                    onClick={() => void changeTheme(id)}
+                    className={cn(
+                      "flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      isActive
+                        ? "bg-card text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    <Icon className="size-4" />
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {themeError ? (
+              <p role="alert" className="mt-2 text-xs text-destructive">
+                {themeError}
+              </p>
+            ) : null}
+          </section>
+        </div>
+
         <section
           aria-labelledby="backup-title"
           className="space-y-4 rounded-3xl border border-border/60 bg-card p-4 shadow-sm"
@@ -350,8 +546,9 @@ export default function ProfilePage() {
           ) : null}
 
           <p className="text-[11px] leading-relaxed text-muted-foreground">
-            В файл попадают вещи, фото и имя. «Загрузить базу» заменяет всё, что
-            сейчас в гардеробе, данными из файла.
+            В файл попадают вещи, фото и настройки — имя, город и тема.
+            «Загрузить базу» заменяет всё, что сейчас в гардеробе, данными из
+            файла.
           </p>
         </section>
 

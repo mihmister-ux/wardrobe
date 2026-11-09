@@ -18,14 +18,16 @@ export const SLOT_EMOJI: Record<Slot, string> = {
   accessory: "🧣",
 };
 
-/** Название вещи: своё название, иначе — тип из справочника. */
-export function itemName(item: Pick<Item, "label" | "type">): string {
-  return item.label?.trim() || TYPE_MAP[item.type]?.label || item.type;
+/** Название вещи: своё название, иначе — тип или раздел из справочника. */
+export function itemName(item: Pick<Item, "label" | "type" | "slot">): string {
+  return item.label?.trim() || itemTypeLabel(item);
 }
 
 /** Тип из справочника — без пользовательского названия. */
-export function itemTypeLabel(item: Pick<Item, "type">): string {
-  return TYPE_MAP[item.type]?.label ?? item.type;
+export function itemTypeLabel(item: Pick<Item, "type" | "slot">): string {
+  // У вещей из пакетной загрузки type = "unknown": показываем раздел,
+  // а не английское служебное слово.
+  return TYPE_MAP[item.type]?.label ?? slotLabel(item.slot);
 }
 
 export function slotLabel(slot: Slot): string {

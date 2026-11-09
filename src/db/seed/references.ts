@@ -392,6 +392,17 @@ export const getTypeLabel = (typeId: string): string =>
 export const slotForType = (typeId: string): Slot | undefined =>
   TYPE_MAP[typeId]?.slot;
 
+/**
+ * Тип, подходящий новому слоту. Если вещь уже из этого слота, тип не трогаем:
+ * «Кроссовки» остаются кроссовками. Если тип из другого раздела (или unknown
+ * после пакетной загрузки), оставляем unknown — карточка покажет раздел,
+ * а не случайный конкретный тип вроде «Кроссовки» у всех ботинок.
+ */
+export function typeForSlot(slot: Slot, currentType?: string): string {
+  if (currentType && TYPE_MAP[currentType]?.slot === slot) return currentType;
+  return "unknown";
+}
+
 export const iconForType = (typeId: string): IconKey =>
   TYPE_MAP[typeId]?.icon ?? 'generic';
 
