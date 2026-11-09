@@ -13,6 +13,7 @@ import {
   MapPin,
   Plus,
   RefreshCw,
+  Shirt,
   Sparkles,
   Sun,
   Wind,
@@ -22,6 +23,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { BottomDock, DockSpacer } from "@/components/layout/BottomDock";
 import { useUserName } from "@/features/settings/useUserName";
+import { useHomeOutfits } from "@/features/home/useHomeOutfits";
+import { useWeather } from "@/features/home/useWeather";
 import { cn } from "@/lib/utils";
 
 /* ========================================================================== */
@@ -42,7 +45,7 @@ export interface Weather {
   humidity: number;
 }
 
-export type ItemCategory = "outerwear" | "top" | "bottom" | "shoes" | "accessory";
+export type ItemCategory = "outerwear" | "top" | "bottom" | "fullbody" | "shoes" | "accessory";
 
 export interface OutfitItem {
   id: string;
@@ -62,98 +65,26 @@ export interface Outfit {
 }
 
 /* ========================================================================== */
-/*  Фейковые данные (пока нет БД)                                             */
+/*  Дата (реальная, из Intl)                                                  */
 /* ========================================================================== */
 
-const TODAY_LABEL = "Суббота, 14 марта";
+const DATE_FORMATTER = new Intl.DateTimeFormat("ru-RU", {
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+});
 
-
-const MOCK_WEATHER: Weather = {
-  city: "Москва",
-  temp: 7,
-  feelsLike: 4,
-  high: 9,
-  low: 3,
-  kind: "cloudy",
-  condition: "Облачно",
-  wind: 4,
-  humidity: 68,
-};
-
-const MOCK_OUTFIT_OF_THE_DAY: Outfit = {
-  id: "look-1",
-  title: "Слои для ветреного утра",
-  note: "Тренч держит ветер, хлопковый лонгслив не даст вспотеть в метро. Кроссовки — на сухой асфальт.",
-  score: 87,
-  tags: ["7°C", "Ветрено", "Офис", "Слои"],
-  items: [
-    { id: "i-1", name: "Тренч бежевый", category: "outerwear", emoji: "🧥" },
-    { id: "i-2", name: "Лонгслив молочный", category: "top", emoji: "👕" },
-    { id: "i-3", name: "Джинсы прямые", category: "bottom", emoji: "👖" },
-    { id: "i-4", name: "Кроссовки белые", category: "shoes", emoji: "👟" },
-  ],
-  gradient: "from-amber-200 via-orange-200 to-rose-200",
-};
-
-const MOCK_ALTERNATIVES: Outfit[] = [
-  {
-    id: "look-2",
-    title: "Мягкий кэжуал",
-    note: "Свитер крупной вязки и прямые джинсы — комфорт на весь день.",
-    score: 82,
-    tags: ["7°C", "Прогулка"],
-    items: [
-      { id: "a-1", name: "Свитер оверсайз", category: "top", emoji: "🧶" },
-      { id: "a-2", name: "Джинсы прямые", category: "bottom", emoji: "👖" },
-      { id: "a-3", name: "Кеды", category: "shoes", emoji: "👟" },
-    ],
-    gradient: "from-sky-200 via-indigo-200 to-violet-200",
-  },
-  {
-    id: "look-3",
-    title: "Дождь не помеха",
-    note: "Плащ, непромокаемые ботинки и зонт в тон.",
-    score: 78,
-    tags: ["Дождь", "Улица"],
-    items: [
-      { id: "b-1", name: "Плащ тёмно-синий", category: "outerwear", emoji: "🧥" },
-      { id: "b-2", name: "Ботинки треккинговые", category: "shoes", emoji: "🥾" },
-      { id: "b-3", name: "Зонт компактный", category: "accessory", emoji: "☂️" },
-    ],
-    gradient: "from-slate-200 via-slate-300 to-blue-200",
-  },
-  {
-    id: "look-4",
-    title: "Рабочий минимализм",
-    note: "Рубашка, брюки и оксфорды — универсально для встреч.",
-    score: 74,
-    tags: ["Офис", "Встречи"],
-    items: [
-      { id: "c-1", name: "Рубашка белая", category: "top", emoji: "👕" },
-      { id: "c-2", name: "Брюки со стрелкой", category: "bottom", emoji: "👖" },
-      { id: "c-3", name: "Оксфорды", category: "shoes", emoji: "👞" },
-    ],
-    gradient: "from-emerald-200 via-teal-200 to-cyan-200",
-  },
-  {
-    id: "look-5",
-    title: "Вечерний выход",
-    note: "Платье миди, тренч сверху и сапоги на низком каблуке.",
-    score: 71,
-    tags: ["Вечер", "Ужин"],
-    items: [
-      { id: "d-1", name: "Платье миди", category: "top", emoji: "👗" },
-      { id: "d-2", name: "Тренч бежевый", category: "outerwear", emoji: "🧥" },
-      { id: "d-3", name: "Сапоги до колена", category: "shoes", emoji: "👢" },
-    ],
-    gradient: "from-rose-200 via-fuchsia-200 to-purple-200",
-  },
-];
+/** «Суббота, 9 ноября» — сегодняшняя дата с заглавной буквы. */
+function formatToday(date = new Date()): string {
+  const label = DATE_FORMATTER.format(date);
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
 
 const CATEGORY_LABEL: Record<ItemCategory, string> = {
   outerwear: "верхний слой",
   top: "верх",
   bottom: "низ",
+  fullbody: "цельный образ",
   shoes: "обувь",
   accessory: "аксессуар",
 };
@@ -265,7 +196,7 @@ function Stat({
 /*  1. Погода                                                                 */
 /* ========================================================================== */
 
-function WeatherCard({ weather }: { weather: Weather }) {
+function WeatherCard({ weather, isFallback = false }: { weather: Weather; isFallback?: boolean }) {
   const Icon = WEATHER_ICON[weather.kind];
   const temp = weather.temp > 0 ? `+${weather.temp}` : String(weather.temp);
 
@@ -300,9 +231,14 @@ function WeatherCard({ weather }: { weather: Weather }) {
         <Stat icon={Droplets} label="Влажность" value={`${weather.humidity}%`} />
       </div>
 
-      <p className="border-t border-border/60 bg-muted/40 px-4 py-2.5 text-xs text-muted-foreground">
-        {weatherHint(weather)}
-      </p>
+      <div className="space-y-1 border-t border-border/60 bg-muted/40 px-4 py-2.5 text-xs text-muted-foreground">
+        <p>{weatherHint(weather)}</p>
+        {isFallback ? (
+          <p className="text-[11px] text-muted-foreground/70">
+            Показана погода по умолчанию: разрешите геолокацию, чтобы видеть свою.
+          </p>
+        ) : null}
+      </div>
     </section>
   );
 }
@@ -315,10 +251,12 @@ function OutfitOfTheDay({
   outfit,
   onOpen,
   onRegenerate,
+  isRegenerating = false,
 }: {
   outfit: Outfit;
   onOpen?: () => void;
   onRegenerate?: () => void;
+  isRegenerating?: boolean;
 }) {
   const [saved, setSaved] = React.useState(false);
 
@@ -396,12 +334,60 @@ function OutfitOfTheDay({
               className="rounded-full"
               aria-label="Предложить другой образ"
               onClick={onRegenerate}
+              disabled={isRegenerating}
             >
-              <RefreshCw className="size-4" />
+              <RefreshCw className={cn("size-4", isRegenerating && "animate-spin")} />
             </Button>
           </div>
         </div>
       </article>
+    </section>
+  );
+}
+
+/* ========================================================================== */
+/*  2.1 Пустые состояния образа дня                                           */
+/* ========================================================================== */
+
+function OutfitSkeleton() {
+  return (
+    <section className="space-y-3" aria-busy="true">
+      <SectionHeader icon={Sparkles} title="Образ дня" hint="Собираем под вашу погоду" />
+      <div className="overflow-hidden rounded-3xl border border-border/60 bg-card shadow-sm">
+        <div className="aspect-[4/3] w-full animate-pulse bg-muted" />
+        <div className="space-y-3 p-4">
+          <div className="h-4 w-2/3 animate-pulse rounded bg-muted" />
+          <div className="h-3 w-full animate-pulse rounded bg-muted" />
+          <div className="h-3 w-4/5 animate-pulse rounded bg-muted" />
+          <div className="h-9 w-full animate-pulse rounded-full bg-muted" />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function EmptyOutfit({ onAddItem }: { onAddItem?: () => void }) {
+  return (
+    <section className="space-y-3">
+      <SectionHeader icon={Sparkles} title="Образ дня" hint="Собран под текущую погоду" />
+
+      <div className="rounded-3xl border border-dashed border-border bg-card/60 px-6 py-9 text-center">
+        <div className="mx-auto grid size-14 place-items-center rounded-2xl bg-primary/10 text-primary">
+          <Shirt className="size-7" />
+        </div>
+
+        <h3 className="mt-4 text-base font-semibold">Пока нечего предложить</h3>
+        <p className="mx-auto mt-1 max-w-[19rem] text-sm text-muted-foreground">
+          Добавьте вещи, чтобы увидеть образ: хватит верха, низа и пары обуви.
+        </p>
+
+        {onAddItem ? (
+          <Button className="mt-4 rounded-full" onClick={onAddItem}>
+            <Plus className="size-4" />
+            Добавить вещь
+          </Button>
+        ) : null}
+      </div>
     </section>
   );
 }
@@ -528,32 +514,32 @@ function AddItemFab({ onClick }: { onClick?: () => void }) {
 /* ========================================================================== */
 
 export interface HomePageProps {
-  weather?: Weather;
-  outfitOfTheDay?: Outfit;
-  alternatives?: Outfit[];
   onAddItem?: () => void;
-  onRegenerate?: () => void;
   onOpenOutfit?: (outfit: Outfit) => void;
 }
 
-export default function HomePage({
-  weather = MOCK_WEATHER,
-  outfitOfTheDay = MOCK_OUTFIT_OF_THE_DAY,
-  alternatives = MOCK_ALTERNATIVES,
-  onAddItem,
-  onRegenerate,
-  onOpenOutfit,
-}: HomePageProps) {
+export default function HomePage({ onAddItem, onOpenOutfit }: HomePageProps) {
   const { name } = useUserName();
+  const { weather, isFallback: isWeatherFallback } = useWeather();
+  const {
+    outfitOfTheDay,
+    alternatives,
+    isLoading: isOutfitsLoading,
+    isRegenerating,
+    error: outfitsError,
+    regenerate,
+  } = useHomeOutfits();
+
   const userName = name?.trim() || "гость";
   const userInitial = userName.charAt(0).toUpperCase();
+  const todayLabel = formatToday();
 
   return (
     <div className="min-h-dvh bg-background">
       <div className="mx-auto w-full max-w-md px-4 pt-5">
         <header className="mb-5 flex items-start justify-between gap-3">
           <div>
-            <p className="text-xs text-muted-foreground">{TODAY_LABEL}</p>
+            <p className="text-xs text-muted-foreground">{todayLabel}</p>
             <h1 className="text-xl font-semibold tracking-tight">Привет, {userName} 👋</h1>
           </div>
           <div className="grid size-10 place-items-center rounded-full bg-gradient-to-br from-amber-300 to-rose-300 text-sm font-semibold text-white shadow-sm">
@@ -562,12 +548,30 @@ export default function HomePage({
         </header>
 
         <main className="space-y-6">
-          <WeatherCard weather={weather} />
-          <OutfitOfTheDay
-            outfit={outfitOfTheDay}
-            onRegenerate={onRegenerate}
-            onOpen={() => onOpenOutfit?.(outfitOfTheDay)}
-          />
+          <WeatherCard weather={weather} isFallback={isWeatherFallback} />
+
+          {outfitsError ? (
+            <p
+              role="alert"
+              className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-2.5 text-xs text-destructive"
+            >
+              Не удалось прочитать гардероб: {outfitsError}
+            </p>
+          ) : null}
+
+          {isOutfitsLoading ? (
+            <OutfitSkeleton />
+          ) : outfitOfTheDay ? (
+            <OutfitOfTheDay
+              outfit={outfitOfTheDay}
+              isRegenerating={isRegenerating}
+              onRegenerate={regenerate}
+              onOpen={() => onOpenOutfit?.(outfitOfTheDay)}
+            />
+          ) : (
+            <EmptyOutfit onAddItem={onAddItem} />
+          )}
+
           <AlternativesCarousel outfits={alternatives} onOpen={onOpenOutfit} />
         </main>
 
