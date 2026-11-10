@@ -100,7 +100,7 @@ export function ItemPhoto({ item, className, dimmed = false }: ItemPhotoProps) {
       loading="lazy"
       draggable={false}
       className={cn(
-        "h-full w-full object-cover transition-opacity",
+        "h-full w-full object-contain transition-opacity",
         dimmed && "opacity-55",
         className,
       )}

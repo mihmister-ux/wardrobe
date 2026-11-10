@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { db } from "@/db/db";
 import type { Item, Photo } from "@/db/types";
+import { guessItemColor } from "@/features/items/guessColor";
 import { itemsCountLabel, plural } from "@/features/items/itemView";
 import {
   findDuplicate,
@@ -187,13 +188,14 @@ export function BulkUpload() {
           const itemId = crypto.randomUUID();
           const photoId = crypto.randomUUID();
           const now = Date.now();
+          const label = cleanLabel(file.name);
 
           const item: Item = {
             id: itemId,
             type: "unknown",
             slot: "top",
-            label: cleanLabel(file.name),
-            color: { family: "gray", hex: "#9AA0A6", label: "Серый" },
+            label,
+            color: guessItemColor(label),
             pattern: "solid",
             texture: "cotton",
             warmth: 3,

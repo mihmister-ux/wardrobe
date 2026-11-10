@@ -10,7 +10,7 @@
 
 import type { Item, Occasion, Slot } from "@/db/types";
 import { assessPalette, type HarmonyId, type PalettePiece } from "@/generator/colors";
-import { itemName, itemTypeLabel, SLOT_EMOJI } from "@/features/items/itemView";
+import { itemName, itemTypeLabel } from "@/features/items/itemView";
 import { scoreOutfit } from "@/features/home/scoreOutfit";
 import type { Outfit as UiOutfit } from "@/features/home/HomePage";
 
@@ -162,7 +162,7 @@ export function buildOutfits({
         id: item.id,
         name: itemName(item),
         category: item.slot,
-        emoji: SLOT_EMOJI[item.slot],
+        item,
       })),
       gradient: GRADIENTS[assessment.id] ?? GRADIENTS.mixed,
     });

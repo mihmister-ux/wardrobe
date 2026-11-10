@@ -31,6 +31,7 @@ import type { OutfitScore } from "@/features/home/scoreOutfit";
 import { useHomeOutfits } from "@/features/home/useHomeOutfits";
 import { useWeather } from "@/features/home/useWeather";
 import { useUserName } from "@/features/settings/useUserName";
+import { ItemPhoto } from "@/features/wardrobe/ItemPhoto";
 import { cn } from "@/lib/utils";
 
 /* ========================================================================== */
@@ -57,7 +58,8 @@ export interface OutfitItem {
   id: string;
   name: string;
   category: ItemCategory;
-  emoji: string;
+  /** Полная вещь из базы — чтобы показать настоящее фото, а не эмодзи. */
+  item: Item;
 }
 
 export interface Outfit {
@@ -386,14 +388,15 @@ function OutfitOfTheDay({
           <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/10 to-white/30" />
 
           <div className="relative grid h-full grid-cols-2 gap-2 p-3">
-            {outfit.items.slice(0, 4).map((item) => (
+            {outfit.items.slice(0, 4).map((entry) => (
               <div
-                key={item.id}
-                className="group grid place-items-center rounded-2xl bg-white/40 backdrop-blur-sm border border-white/30 transition-all duration-500 hover:bg-white/60 hover:scale-105"
+                key={entry.id}
+                className="group relative overflow-hidden rounded-2xl border border-white/30 bg-white/40 backdrop-blur-sm transition-all duration-500 hover:bg-white/60 hover:scale-105"
               >
-                <span className="text-4xl drop-shadow-sm sm:text-5xl transition-transform duration-500 group-hover:scale-110" role="img" aria-label={item.name}>
-                  {item.emoji}
-                </span>
+                <ItemPhoto
+                  item={entry.item}
+                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                />
               </div>
             ))}
           </div>
@@ -471,14 +474,16 @@ function OutfitOfTheDay({
           </div>
 
           <ul className="space-y-1.5 border-t border-border/50 pt-3">
-            {outfit.items.map((item) => (
-              <li key={item.id} className="flex items-center justify-between gap-3 text-sm bg-white/30 rounded-xl px-3 py-2">
+            {outfit.items.map((entry) => (
+              <li key={entry.id} className="flex items-center justify-between gap-3 text-sm bg-white/30 rounded-xl px-3 py-2">
                 <span className="flex min-w-0 items-center gap-2">
-                  <span aria-hidden>{item.emoji}</span>
-                  <span className="truncate font-medium">{item.name}</span>
+                  <span className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-md bg-white/50">
+                    <ItemPhoto item={entry.item} className="h-full w-full object-cover" />
+                  </span>
+                  <span className="truncate font-medium">{entry.name}</span>
                 </span>
                 <span className="shrink-0 text-xs text-muted-foreground bg-white/50 px-2 py-0.5 rounded-full">
-                  {CATEGORY_LABEL[item.category]}
+                  {CATEGORY_LABEL[entry.category]}
                 </span>
               </li>
             ))}
