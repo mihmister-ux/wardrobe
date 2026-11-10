@@ -1,0 +1,19 @@
+{
+  "name": "Умный гардероб",
+  "short_name": "Гардероб",
+  "description": "Образ дня под погоду, оценка сочетаний и каталог вещей.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f1ece1",
+  "theme_color": "#f1ece1",
+  "icons": [
+    {
+      "src": "./favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

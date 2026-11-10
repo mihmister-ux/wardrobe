@@ -18,9 +18,20 @@ export const SLOT_EMOJI: Record<Slot, string> = {
   accessory: "🧣",
 };
 
-/** Название вещи: своё название, иначе — тип или раздел из справочника. */
+/**
+ * Название вещи для показа: пользовательское имя с заглавной буквы, иначе —
+ * тип или раздел из справочника.
+ *
+ * Пакетная загрузка берёт имя из имени файла фотографии, поэтому название
+ * может быть похоже на дату («20261107 131845»). Такое служебное имя заменяем
+ * на тип вещи, чтобы вместо «сырого ID» пользователь видел «Верх» или «Обувь».
+ */
+const TIMESTAMP_LABEL = /^\d{4,8}(?:[ _-]\d{4,6})?$/u;
+
 export function itemName(item: Pick<Item, "label" | "type" | "slot">): string {
-  return item.label?.trim() || itemTypeLabel(item);
+  const raw = item.label?.trim();
+  if (!raw || TIMESTAMP_LABEL.test(raw)) return itemTypeLabel(item);
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
 
 /** Тип из справочника — без пользовательского названия. */

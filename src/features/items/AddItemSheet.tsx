@@ -181,7 +181,7 @@ export default function AddItemSheet({ open, onOpenChange, onSaved }: AddItemShe
             />
             {form.previewUrl ? (
               <div className="relative">
-                <img src={form.previewUrl} alt="Превью вещи" className="aspect-square max-h-72 w-full rounded-2xl border border-border object-cover" />
+                <img src={form.previewUrl} alt="Превью вещи" className="aspect-square max-h-72 w-full rounded-2xl border border-border object-contain" />
                 <Button
                   variant="outline"
                   size="icon"

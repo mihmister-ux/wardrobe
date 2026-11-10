@@ -141,8 +141,8 @@ function SectionHeader({
   return (
     <div className="flex items-end justify-between gap-3">
       <div>
-        <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          <Icon className="size-4" />
+        <h2 className="flex items-center gap-2 font-serif text-lg font-semibold tracking-tight">
+          <Icon className="size-4 text-muted-foreground" />
           {title}
         </h2>
         {hint ? <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p> : null}
@@ -195,7 +195,7 @@ function ScoreRing({
           className="stroke-primary transition-[stroke-dasharray] duration-500"
         />
       </svg>
-      <span aria-hidden className="absolute text-xs font-semibold tabular-nums">
+      <span aria-hidden className="absolute font-mono text-xs font-semibold tabular-nums">
         {Math.round(clamped)}%
       </span>
     </div>
@@ -216,7 +216,7 @@ function Stat({
       <Icon className="size-4 shrink-0 text-muted-foreground" />
       <div className="text-xs leading-tight">
         <div className="text-muted-foreground">{label}</div>
-        <div className="font-medium tabular-nums">{value}</div>
+        <div className="font-mono font-medium tabular-nums">{value}</div>
       </div>
     </div>
   );
@@ -229,11 +229,10 @@ function Stat({
 function WeatherCard({
   weather,
   isFallback = false,
-  error = null,
 }: {
   weather: Weather;
+  /** Данных нет: вместо технической ошибки показываем короткую подпись. */
   isFallback?: boolean;
-  error?: string | null;
 }) {
   const Icon = WEATHER_ICON[weather.kind];
   const temp = weather.temp > 0 ? `+${weather.temp}` : String(weather.temp);
@@ -257,17 +256,12 @@ function WeatherCard({
             </Link>
           </div>
           <div className="flex flex-wrap items-baseline gap-2">
-            <span className="text-4xl font-semibold leading-none tracking-tight tabular-nums">
+            <span className="font-mono text-4xl font-semibold leading-none tracking-tight tabular-nums">
               {temp}°
             </span>
             <span className="text-sm text-muted-foreground">{weather.condition}</span>
-            {isFallback ? (
-              <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">
-                нет данных
-              </span>
-            ) : null}
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="font-mono text-xs tabular-nums text-muted-foreground">
             ощущается как {weather.feelsLike}° · {weather.low}…{weather.high}°
           </p>
         </div>
@@ -284,9 +278,8 @@ function WeatherCard({
       <div className="space-y-1 border-t border-border/60 bg-muted/40 px-4 py-2.5 text-xs text-muted-foreground">
         <p>{weatherHint(weather)}</p>
         {isFallback ? (
-          <p className="text-xs">
-            {error ??
-              "Показана погода по умолчанию: укажите город в профиле или разрешите геолокацию."}
+          <p className="font-mono text-[11px] text-[#6b6458] dark:text-muted-foreground">
+            Не удалось обновить погоду
           </p>
         ) : null}
       </div>
@@ -319,19 +312,19 @@ function SituationPicker({
   onChange: (next: Occasion) => void;
 }) {
   return (
-    <section aria-labelledby="situation-title" className="space-y-2">
+    <section aria-labelledby="situation-title" className="space-y-3">
       <div className="flex items-end justify-between gap-3">
         <h2
           id="situation-title"
-          className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+          className="flex items-center gap-2 font-serif text-lg font-semibold tracking-tight"
         >
-          <Compass className="size-4" />
+          <Compass className="size-4 text-muted-foreground" />
           Куда собираемся
         </h2>
-        <span className="text-xs text-muted-foreground">влияет на оценку</span>
+        <span className="font-mono text-[11px] text-muted-foreground">влияет на оценку</span>
       </div>
 
-      <div role="group" aria-label="Ситуация" className="flex flex-wrap gap-1">
+      <div role="group" aria-label="Ситуация" className="flex flex-wrap gap-1.5">
         {SITUATIONS.map(({ id, emoji }) => {
           const isActive = id === value;
           return (
@@ -341,7 +334,7 @@ function SituationPicker({
               aria-pressed={isActive}
               onClick={() => onChange(id)}
               className={cn(
-                "inline-flex items-center gap-1 rounded-full border px-2.5 py-1.5 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                "inline-flex min-h-11 items-center gap-1.5 rounded-full border px-3.5 text-sm font-medium transition-[transform,border-color,background-color,color] duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 isActive
                   ? "border-primary bg-primary text-primary-foreground shadow-sm"
                   : "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -382,20 +375,24 @@ function OutfitOfTheDay({
     <section className="space-y-3">
       <SectionHeader icon={Sparkles} title="Образ дня" hint="Собран под текущую погоду" />
 
-      <article className="overflow-hidden rounded-3xl bg-white/80 backdrop-blur-xl border border-white/20 shadow-[0_20px_50px_-30px_rgba(15,23,42,0.4)] transition-all duration-300 hover:shadow-[0_30px_60px_-25px_rgba(15,23,42,0.35)] dark:bg-slate-800/80 dark:border-slate-700/50 dark:shadow-[0_20px_50px_-30px_rgba(0,0,0,0.5)]">
-        <div className={cn("relative aspect-[4/3] w-full bg-gradient-to-br from-primary/20 via-secondary/20 to-accent/20", outfit.gradient)}>
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_15%,rgba(255,255,255,0.6),transparent_60%)]" />
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/10 to-white/30" />
+      <article className="overflow-hidden rounded-3xl border border-border/60 bg-card shadow-[0_24px_60px_-34px_rgba(15,23,42,0.5)]">
+        <div
+          className={cn(
+            "relative w-full bg-gradient-to-br from-primary/5 via-secondary/10 to-accent/15",
+            outfit.gradient,
+          )}
+        >
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_15%,rgba(255,255,255,0.5),transparent_60%)]" />
 
-          <div className="relative grid h-full grid-cols-2 gap-2 p-3">
+          <div className="relative grid grid-cols-2 gap-3 p-3">
             {outfit.items.slice(0, 4).map((entry) => (
               <div
                 key={entry.id}
-                className="group relative overflow-hidden rounded-2xl border border-white/30 bg-white/40 backdrop-blur-sm transition-all duration-500 hover:bg-white/60 hover:scale-105"
+                className="flex aspect-square items-center justify-center overflow-hidden rounded-2xl border border-border/40 bg-[#fbf8f1] p-3 dark:bg-card"
               >
                 <ItemPhoto
                   item={entry.item}
-                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                  className="h-full w-full object-contain drop-shadow-sm"
                 />
               </div>
             ))}
@@ -413,15 +410,15 @@ function OutfitOfTheDay({
             aria-pressed={saved}
             aria-label={saved ? "Убрать из избранного" : "Добавить в избранное"}
             onClick={() => setSaved((v) => !v)}
-            className="absolute left-3 top-3 grid size-9 place-items-center rounded-full bg-white/50 text-slate-900 backdrop-blur-sm transition hover:bg-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="absolute left-3 top-3 grid size-9 place-items-center rounded-full bg-background/60 text-slate-900 backdrop-blur-sm transition hover:bg-background/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <Heart className={cn("size-4", saved && "fill-rose-500 text-rose-500")} />
           </button>
         </div>
 
-        <div className="space-y-3 p-4 bg-white/50 backdrop-blur-sm">
+        <div className="space-y-3 p-4">
           <div className="space-y-1">
-            <h3 className="text-lg font-bold leading-tight">{outfit.title}</h3>
+            <h3 className="font-serif text-2xl font-semibold leading-tight">{outfit.title}</h3>
             <p className="text-sm text-muted-foreground">{outfit.note}</p>
           </div>
 
@@ -430,16 +427,16 @@ function OutfitOfTheDay({
               className="flex flex-wrap items-center gap-1.5 text-xs"
               title="Процент = сочетаемость цвета + до 10 за погоду + до 5 за уместность"
             >
-              <span className="font-bold text-foreground">
+              <span className="font-mono font-semibold tabular-nums text-foreground">
                 Оценка {outfit.score}%
               </span>
-              <span className="rounded-full border border-border/50 bg-white/50 px-2 py-0.5 text-muted-foreground">
+              <span className="rounded-full border border-border/50 bg-card px-2 py-0.5 font-mono text-muted-foreground">
                 цвет {parts.color}
               </span>
-              <span className="rounded-full border border-border/50 bg-white/50 px-2 py-0.5 text-muted-foreground">
+              <span className="rounded-full border border-border/50 bg-card px-2 py-0.5 font-mono text-muted-foreground">
                 погода +{parts.temperature}/10
               </span>
-              <span className="rounded-full border border-border/50 bg-white/50 px-2 py-0.5 text-muted-foreground">
+              <span className="rounded-full border border-border/50 bg-card px-2 py-0.5 font-mono text-muted-foreground">
                 ситуация +{parts.formality}/5
               </span>
             </div>
@@ -450,7 +447,7 @@ function OutfitOfTheDay({
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 font-mono text-xs text-primary">
               <Sparkles className="size-3.5" />
               {outfit.harmony}
             </span>
@@ -458,7 +455,7 @@ function OutfitOfTheDay({
               {outfit.palette.map((hex) => (
                 <span
                   key={hex}
-                  className="size-4 rounded-full border border-white/30 shadow-sm"
+                  className="size-4 rounded-full border border-border shadow-sm"
                   style={{ backgroundColor: hex }}
                 />
               ))}
@@ -467,7 +464,7 @@ function OutfitOfTheDay({
 
           <div className="flex flex-wrap gap-1.5">
             {outfit.tags.map((tag) => (
-              <Badge key={tag} variant="secondary" className="font-normal text-xs">
+              <Badge key={tag} variant="secondary" className="font-mono text-xs font-normal">
                 {tag}
               </Badge>
             ))}
@@ -475,14 +472,14 @@ function OutfitOfTheDay({
 
           <ul className="space-y-1.5 border-t border-border/50 pt-3">
             {outfit.items.map((entry) => (
-              <li key={entry.id} className="flex items-center justify-between gap-3 text-sm bg-white/30 rounded-xl px-3 py-2">
-                <span className="flex min-w-0 items-center gap-2">
-                  <span className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-md bg-white/50">
-                    <ItemPhoto item={entry.item} className="h-full w-full object-cover" />
+              <li key={entry.id} className="flex items-center justify-between gap-3 rounded-xl bg-muted/40 px-3 py-2 text-sm">
+                <span className="flex min-w-0 items-center gap-2.5">
+                  <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-background/70">
+                    <ItemPhoto item={entry.item} className="h-full w-full object-contain" />
                   </span>
                   <span className="truncate font-medium">{entry.name}</span>
                 </span>
-                <span className="shrink-0 text-xs text-muted-foreground bg-white/50 px-2 py-0.5 rounded-full">
+                <span className="shrink-0 rounded-full bg-background/60 px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
                   {CATEGORY_LABEL[entry.category]}
                 </span>
               </li>
@@ -490,7 +487,7 @@ function OutfitOfTheDay({
           </ul>
 
           <div className="flex items-center gap-2 pt-1">
-            <Button className="flex-1 rounded-full bg-primary hover:bg-primary/90" onClick={onOpen}>
+            <Button className="flex-1 rounded-full" onClick={onOpen}>
               Носить сегодня
             </Button>
             <Button
@@ -521,10 +518,10 @@ function OutfitSkeleton() {
       <div className="overflow-hidden rounded-3xl border border-border/60 bg-card shadow-sm">
         <div className="aspect-[4/3] w-full animate-pulse bg-muted" />
         <div className="space-y-3 p-4">
-          <div className="h-4 w-2/3 animate-pulse rounded bg-muted" />
+          <div className="h-5 w-2/3 animate-pulse rounded bg-muted" />
           <div className="h-3 w-full animate-pulse rounded bg-muted" />
           <div className="h-3 w-4/5 animate-pulse rounded bg-muted" />
-          <div className="h-9 w-full animate-pulse rounded-full bg-muted" />
+          <div className="h-11 w-full animate-pulse rounded-full bg-muted" />
         </div>
       </div>
     </section>
@@ -541,7 +538,7 @@ function EmptyOutfit({ onAddItem }: { onAddItem?: () => void }) {
           <Shirt className="size-7" />
         </div>
 
-        <h3 className="mt-4 text-base font-semibold">Пока нечего предложить</h3>
+        <h3 className="mt-4 font-serif text-xl font-semibold">Пока нечего предложить</h3>
         <p className="mx-auto mt-1 max-w-[19rem] text-sm text-muted-foreground">
           Добавьте вещи, чтобы увидеть образ: хватит верха, низа и пары обуви.
         </p>
@@ -558,41 +555,71 @@ function EmptyOutfit({ onAddItem }: { onAddItem?: () => void }) {
 }
 
 /* ========================================================================== */
-/*  3. Альтернативы (правая колонка)                                          */
+/*  3. Альтернативы (реальные варианты, клик подставляет их в образ дня)      */
 /* ========================================================================== */
 
-function AlternativesStub() {
+function Alternatives({
+  alternatives,
+  selectedId,
+  onSelect,
+}: {
+  alternatives: Outfit[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+}) {
+  // Выбираем «главное» фото альтернативы: цельный образ, иначе первый элемент.
+  const hero = (outfit: Outfit): OutfitItem | undefined =>
+    outfit.items.find((entry) => entry.category === "fullbody") ?? outfit.items[0];
+
   return (
     <section className="space-y-3">
-      <SectionHeader icon={LayoutGrid} title="Альтернативы" hint="Несколько образов на выбор" />
+      <SectionHeader icon={LayoutGrid} title="Альтернативы" hint="Ещё варианты из ваших вещей" />
 
-      <div className="rounded-3xl border border-dashed border-border bg-card/60 p-3">
-        <div className="grid grid-cols-3 gap-2">
-          {["🌤", "🍂", "🌙"].map((emoji) => (
-            <div
-              key={emoji}
-              className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-gradient-to-br from-muted to-secondary/70"
-            >
-              <span
-                aria-hidden
-                className="absolute inset-0 grid place-items-center text-2xl opacity-25 blur-[1.5px]"
-              >
-                {emoji}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        <p className="mt-3 text-xs leading-snug text-muted-foreground">
-          Скоро здесь будет 3–5 вариантов на день. Пока показываем лучший образ.
+      {alternatives.length === 0 ? (
+        <p className="rounded-3xl border border-dashed border-border bg-card/60 px-4 py-5 text-center text-xs text-muted-foreground">
+          Пока только один образ. Добавьте больше вещей — появятся альтернативы
+          на выбор.
         </p>
-      </div>
+      ) : (
+        <div className="grid grid-cols-3 gap-2">
+          {alternatives.map((outfit) => {
+            const main = hero(outfit);
+            return (
+              <button
+                key={outfit.id}
+                type="button"
+                onClick={() => onSelect(outfit.id)}
+                aria-pressed={outfit.id === selectedId}
+                aria-label={`Показать образ «${outfit.title}», оценка ${outfit.score}%`}
+                className={cn(
+                  "group flex flex-col rounded-2xl border bg-card p-1.5 text-left transition-[transform,border-color,box-shadow] duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  outfit.id === selectedId
+                    ? "border-primary ring-2 ring-primary/25"
+                    : "border-border/70 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg",
+                )}
+              >
+                {main ? (
+                  <span className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl bg-background p-2">
+                    <ItemPhoto item={main.item} className="h-full w-full object-contain" />
+                  </span>
+                ) : null}
+                <span className="mt-1.5 line-clamp-2 px-0.5 text-[11px] font-medium leading-tight">
+                  {outfit.title}
+                </span>
+                <span className="block px-0.5 font-mono text-[10px] tabular-nums text-muted-foreground">
+                  {outfit.score}%
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </section>
   );
 }
 
 /* ========================================================================== */
-/*  4. Список вещей (правая колонка)                                          */
+/*  4. Список вещей                                                          */
 /* ========================================================================== */
 
 function WardrobePreview({ items, onAddItem }: { items: Item[]; onAddItem?: () => void }) {
@@ -608,7 +635,7 @@ function WardrobePreview({ items, onAddItem }: { items: Item[]; onAddItem?: () =
           items.length > 0 ? (
             <Link
               to="/wardrobe"
-              className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium text-primary hover:bg-primary/5"
+              className="inline-flex min-h-11 items-center gap-1 rounded-full px-2 py-1 text-xs font-medium text-primary transition hover:bg-primary/5"
             >
               Все
               <ArrowRight className="size-3.5" />
@@ -642,7 +669,8 @@ function WardrobePreview({ items, onAddItem }: { items: Item[]; onAddItem?: () =
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{itemName(item)}</p>
                 <p className="text-xs text-muted-foreground">
-                  {item.color.label} · {formatItemRange(item)}
+                  {item.color.label} ·{" "}
+                  <span className="font-mono tabular-nums">{formatItemRange(item)}</span>
                 </p>
               </div>
               <span
@@ -656,7 +684,9 @@ function WardrobePreview({ items, onAddItem }: { items: Item[]; onAddItem?: () =
       )}
 
       {items.length > shown.length ? (
-        <p className="text-xs text-muted-foreground">И ещё {items.length - shown.length} в гардеробе</p>
+        <p className="font-mono text-xs tabular-nums text-muted-foreground">
+          И ещё {items.length - shown.length} в гардеробе
+        </p>
       ) : null}
     </section>
   );
@@ -673,11 +703,13 @@ export interface HomePageProps {
 
 export default function HomePage({ onAddItem, onOpenOutfit }: HomePageProps) {
   const { name } = useUserName();
-  const { weather, isFallback: isWeatherFallback, error: weatherError } =
-    useWeather();
+  const { weather, isFallback: isWeatherFallback } = useWeather();
   const [occasion, setOccasion] = React.useState<Occasion>(() => defaultOccasion());
   const {
     outfitOfTheDay,
+    alternatives,
+    select,
+    selectedId,
     items,
     isLoading: isOutfitsLoading,
     isRegenerating,
@@ -695,35 +727,35 @@ export default function HomePage({ onAddItem, onOpenOutfit }: HomePageProps) {
         eyebrow={todayLabel}
         title={`Привет, ${userName} 👋`}
         action={
-          <div className="grid size-10 place-items-center rounded-full bg-gradient-to-br from-amber-300 to-rose-300 text-sm font-semibold text-white shadow-sm">
+          <div className="grid size-11 place-items-center rounded-full bg-gradient-to-br from-amber-300 to-rose-300 font-serif text-sm font-semibold text-white shadow-sm">
             {userInitial}
           </div>
         }
       />
 
-      <main className="space-y-6 lg:grid lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)] lg:items-start lg:gap-6 lg:space-y-0">
-        <div className="space-y-6">
+      <main className="space-y-6">
+        {/* Верхняя полоса: погода + ситуация. */}
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] lg:items-start">
           <Reveal>
-            <WeatherCard
-              weather={weather}
-              isFallback={isWeatherFallback}
-              error={weatherError}
-            />
+            <WeatherCard weather={weather} isFallback={isWeatherFallback} />
           </Reveal>
 
           <Reveal delay={0.03}>
             <SituationPicker value={occasion} onChange={setOccasion} />
           </Reveal>
+        </div>
 
-          {outfitsError ? (
-            <p
-              role="alert"
-              className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-2.5 text-xs text-destructive"
-            >
-              Не удалось прочитать гардероб: {outfitsError}
-            </p>
-          ) : null}
+        {outfitsError ? (
+          <p
+            role="alert"
+            className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-2.5 text-xs text-destructive"
+          >
+            Не удалось прочитать гардероб: {outfitsError}
+          </p>
+        ) : null}
 
+        {/* Гейро: большая карточка образа дня + маленькие альтернативы сбоку. */}
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:items-start">
           <Reveal delay={0.06}>
             {isOutfitsLoading ? (
               <OutfitSkeleton />
@@ -739,16 +771,20 @@ export default function HomePage({ onAddItem, onOpenOutfit }: HomePageProps) {
               <EmptyOutfit onAddItem={onAddItem} />
             )}
           </Reveal>
-        </div>
 
-        <div className="space-y-6">
-          <Reveal delay={0.12}>
-            <AlternativesStub />
-          </Reveal>
+          <div className="space-y-6">
+            <Reveal delay={0.12}>
+              <Alternatives
+                alternatives={alternatives}
+                selectedId={selectedId}
+                onSelect={select}
+              />
+            </Reveal>
 
-          <Reveal delay={0.18}>
-            <WardrobePreview items={items} onAddItem={onAddItem} />
-          </Reveal>
+            <Reveal delay={0.18}>
+              <WardrobePreview items={items} onAddItem={onAddItem} />
+            </Reveal>
+          </div>
         </div>
       </main>
     </>

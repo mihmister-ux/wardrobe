@@ -184,7 +184,7 @@ export function EditItemSheet({ item, onClose }: EditItemSheetProps) {
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-4">
           <div className="flex items-center gap-3">
             <div className="relative size-20 shrink-0 overflow-hidden rounded-2xl bg-slate-100 dark:bg-slate-800">
-              <ItemPhoto item={item} className="h-full w-full object-cover" />
+              <ItemPhoto item={item} className="h-full w-full object-contain" />
             </div>
             <p className="text-xs leading-relaxed text-muted-foreground">
               Фото остаётся прежним. Меняются название, раздел, сезоны, цвет,

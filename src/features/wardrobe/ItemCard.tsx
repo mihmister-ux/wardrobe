@@ -63,10 +63,10 @@ export function ItemCard({
   return (
     <article
       className={cn(
-        "group relative flex flex-col rounded-3xl bg-white p-2.5 transition-[box-shadow,transform] duration-300 ease-in-out dark:bg-slate-800",
+        "group relative flex flex-col rounded-3xl bg-card p-2.5 transition-[box-shadow,transform] duration-300 ease-in-out",
         isSelected
           ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
-          : "drop-shadow-[0_20px_50px_rgba(15,23,42,0.5)] hover:-translate-y-2 hover:drop-shadow-[0_20px_60px_rgba(15,23,42,0.4)] dark:drop-shadow-[0_18px_40px_-26px_rgba(0,0,0,0.9)] dark:hover:drop-shadow-[0_18px_40px_-20px_rgba(0,0,0,0.95)]",
+          : "drop-shadow-[0_16px_36px_rgba(15,23,42,0.18)] hover:-translate-y-1 hover:drop-shadow-[0_24px_48px_rgba(15,23,42,0.28)] dark:drop-shadow-[0_18px_40px_-26px_rgba(0,0,0,0.9)] dark:hover:drop-shadow-[0_18px_40px_-18px_rgba(0,0,0,0.95)]",
         isBusy && "opacity-60",
       )}
     >
@@ -78,12 +78,12 @@ export function ItemCard({
         className="flex flex-1 flex-col text-left focus-visible:outline-none"
       >
         {/* «Окно» фотографии: независимая подложка + своя тень. */}
-        <span className="relative block overflow-hidden rounded-2xl bg-white shadow-[0_20px_35px_-22px_rgba(15,23,42,0.5)] transition-transform duration-500 ease-out group-hover:-translate-y-1 dark:bg-slate-900 dark:shadow-[0_20px_35px_-20px_rgba(0,0,0,0.9)]">
+        <span className="relative block overflow-hidden rounded-2xl bg-background shadow-[0_20px_35px_-22px_rgba(15,23,42,0.25)] transition-transform duration-500 ease-out group-hover:-translate-y-1 dark:shadow-[0_20px_35px_-20px_rgba(0,0,0,0.9)]">
           <span className="block aspect-square">
             <ItemPhoto
               item={item}
               dimmed={isArchived}
-              className="drop-shadow-[0_18px_14px_rgba(15,23,42,0.25)] transition-transform duration-700 ease-out group-hover:scale-[1.05] dark:drop-shadow-[0_18px_14px_rgba(0,0,0,0.65)]"
+              className="drop-shadow-[0_18px_14px_rgba(15,23,42,0.18)] transition-transform duration-700 ease-out dark:drop-shadow-[0_18px_14px_rgba(0,0,0,0.65)]"
             />
           </span>
         </span>

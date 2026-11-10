@@ -8,10 +8,17 @@ import type { Item, Occasion } from "@/db/types";
 import { buildOutfits } from "@/features/home/buildOutfits";
 import type { Outfit as UiOutfit } from "@/features/home/HomePage";
 
+/** Сколько альтернатив показываем в боковой колонке. */
+const MAX_ALTERNATIVES = 5;
+
 export interface HomeOutfits {
   outfitOfTheDay: UiOutfit | null;
-  /** Варианты на выбор: появятся в следующем шаге, пока карточка-заглушка. */
+  /** Другие варианты из гардероба — маленькие карточки сбоку. */
   alternatives: UiOutfit[];
+  /** Подставить конкретный вариант в основной блок. */
+  select: (id: string) => void;
+  /** id выбранного вручную варианта (для подсветки карточки). */
+  selectedId: string | null;
   items: Item[];
   isLoading: boolean;
   isRegenerating: boolean;
@@ -49,6 +56,7 @@ function newestFirst(items: readonly Item[]): Item[] {
 
 export function useHomeOutfits(temperature: number, occasion: Occasion): HomeOutfits {
   const [rotation, setRotation] = React.useState(0);
+  const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [isRegenerating, setIsRegenerating] = React.useState(false);
   const [readError, setReadError] = React.useState<string | null>(null);
 
@@ -69,11 +77,31 @@ export function useHomeOutfits(temperature: number, occasion: Occasion): HomeOut
     [read, temperature, occasion],
   );
 
-  const outfitOfTheDay =
-    outfits.length > 0 ? outfits[rotation % outfits.length] ?? null : null;
+  // Ручной выбор важнее автоперебора: пользователь кликнул альтернативу —
+  // показываем именно её, пока она есть среди вариантов.
+  const outfitOfTheDay = React.useMemo(() => {
+    if (outfits.length === 0) return null;
+    if (selectedId) {
+      const picked = outfits.find((outfit) => outfit.id === selectedId);
+      if (picked) return picked;
+    }
+    return outfits[rotation % outfits.length] ?? null;
+  }, [outfits, selectedId, rotation]);
+
+  const alternatives = React.useMemo(() => {
+    const currentId = outfitOfTheDay?.id;
+    return outfits
+      .filter((outfit) => outfit.id !== currentId)
+      .slice(0, MAX_ALTERNATIVES);
+  }, [outfits, outfitOfTheDay]);
+
+  const select = React.useCallback((id: string) => {
+    setSelectedId(id);
+  }, []);
 
   /** «Другой образ»: переходим к следующему варианту и перечитываем базу. */
   const regenerate = React.useCallback(async () => {
+    setSelectedId(null);
     setRotation((value) => value + 1);
     setIsRegenerating(true);
     try {
@@ -86,7 +114,9 @@ export function useHomeOutfits(temperature: number, occasion: Occasion): HomeOut
 
   return {
     outfitOfTheDay,
-    alternatives: NO_ALTERNATIVES,
+    alternatives: outfits.length > 1 ? alternatives : NO_ALTERNATIVES,
+    select,
+    selectedId,
     items,
     isLoading: read === undefined,
     isRegenerating,
