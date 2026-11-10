@@ -18,7 +18,7 @@ export interface AppLayoutProps {
  */
 export default function AppLayout({ onAddItem }: AppLayoutProps) {
   return (
-    <div className="min-h-dvh bg-background">
+    <div className="min-h-dvh">
       <SideNav onAddItem={onAddItem} />
 
       <div className="md:pl-60">
