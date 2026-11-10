@@ -380,17 +380,18 @@ function OutfitOfTheDay({
     <section className="space-y-3">
       <SectionHeader icon={Sparkles} title="Образ дня" hint="Собран под текущую погоду" />
 
-      <article className="overflow-hidden rounded-3xl border border-border/60 bg-card shadow-sm">
-        <div className={cn("relative aspect-[4/3] w-full bg-gradient-to-br", outfit.gradient)}>
+      <article className="overflow-hidden rounded-3xl bg-white/80 backdrop-blur-xl border border-white/20 shadow-[0_20px_50px_-30px_rgba(15,23,42,0.4)] transition-all duration-300 hover:shadow-[0_30px_60px_-25px_rgba(15,23,42,0.35)] dark:bg-slate-800/80 dark:border-slate-700/50 dark:shadow-[0_20px_50px_-30px_rgba(0,0,0,0.5)]">
+        <div className={cn("relative aspect-[4/3] w-full bg-gradient-to-br from-primary/20 via-secondary/20 to-accent/20", outfit.gradient)}>
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_15%,rgba(255,255,255,0.6),transparent_60%)]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/10 to-white/30" />
 
           <div className="relative grid h-full grid-cols-2 gap-2 p-3">
             {outfit.items.slice(0, 4).map((item) => (
               <div
                 key={item.id}
-                className="grid place-items-center rounded-2xl bg-white/30 backdrop-blur-[2px]"
+                className="group grid place-items-center rounded-2xl bg-white/40 backdrop-blur-sm border border-white/30 transition-all duration-500 hover:bg-white/60 hover:scale-105"
               >
-                <span className="text-4xl drop-shadow-sm sm:text-5xl" role="img" aria-label={item.name}>
+                <span className="text-4xl drop-shadow-sm sm:text-5xl transition-transform duration-500 group-hover:scale-110" role="img" aria-label={item.name}>
                   {item.emoji}
                 </span>
               </div>
@@ -409,37 +410,37 @@ function OutfitOfTheDay({
             aria-pressed={saved}
             aria-label={saved ? "Убрать из избранного" : "Добавить в избранное"}
             onClick={() => setSaved((v) => !v)}
-            className="absolute left-3 top-3 grid size-9 place-items-center rounded-full bg-white/50 text-slate-900 backdrop-blur transition hover:bg-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="absolute left-3 top-3 grid size-9 place-items-center rounded-full bg-white/50 text-slate-900 backdrop-blur-sm transition hover:bg-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <Heart className={cn("size-4", saved && "fill-rose-500 text-rose-500")} />
           </button>
         </div>
 
-        <div className="space-y-3 p-4">
+        <div className="space-y-3 p-4 bg-white/50 backdrop-blur-sm">
           <div className="space-y-1">
-            <h3 className="text-base font-semibold leading-tight">{outfit.title}</h3>
+            <h3 className="text-lg font-bold leading-tight">{outfit.title}</h3>
             <p className="text-sm text-muted-foreground">{outfit.note}</p>
           </div>
 
           <div className="space-y-1">
             <div
-              className="flex flex-wrap items-center gap-1.5 text-[11px]"
+              className="flex flex-wrap items-center gap-1.5 text-xs"
               title="Процент = сочетаемость цвета + до 10 за погоду + до 5 за уместность"
             >
-              <span className="font-semibold text-foreground">
+              <span className="font-bold text-foreground">
                 Оценка {outfit.score}%
               </span>
-              <span className="rounded-full border border-border px-2 py-0.5 text-muted-foreground">
+              <span className="rounded-full border border-border/50 bg-white/50 px-2 py-0.5 text-muted-foreground">
                 цвет {parts.color}
               </span>
-              <span className="rounded-full border border-border px-2 py-0.5 text-muted-foreground">
+              <span className="rounded-full border border-border/50 bg-white/50 px-2 py-0.5 text-muted-foreground">
                 погода +{parts.temperature}/10
               </span>
-              <span className="rounded-full border border-border px-2 py-0.5 text-muted-foreground">
+              <span className="rounded-full border border-border/50 bg-white/50 px-2 py-0.5 text-muted-foreground">
                 ситуация +{parts.formality}/5
               </span>
             </div>
-            <p className="text-[11px] leading-snug text-muted-foreground">
+            <p className="text-xs leading-snug text-muted-foreground">
               Процент складывается из трёх: гармония цвета, уместность по погоде
               и формальность для ситуации «{situation}».
             </p>
@@ -454,7 +455,7 @@ function OutfitOfTheDay({
               {outfit.palette.map((hex) => (
                 <span
                   key={hex}
-                  className="size-4 rounded-full border border-border"
+                  className="size-4 rounded-full border border-white/30 shadow-sm"
                   style={{ backgroundColor: hex }}
                 />
               ))}
@@ -463,20 +464,20 @@ function OutfitOfTheDay({
 
           <div className="flex flex-wrap gap-1.5">
             {outfit.tags.map((tag) => (
-              <Badge key={tag} variant="secondary" className="font-normal">
+              <Badge key={tag} variant="secondary" className="font-normal text-xs">
                 {tag}
               </Badge>
             ))}
           </div>
 
-          <ul className="space-y-1.5 border-t border-border/60 pt-3">
+          <ul className="space-y-1.5 border-t border-border/50 pt-3">
             {outfit.items.map((item) => (
-              <li key={item.id} className="flex items-center justify-between gap-3 text-sm">
+              <li key={item.id} className="flex items-center justify-between gap-3 text-sm bg-white/30 rounded-xl px-3 py-2">
                 <span className="flex min-w-0 items-center gap-2">
                   <span aria-hidden>{item.emoji}</span>
-                  <span className="truncate">{item.name}</span>
+                  <span className="truncate font-medium">{item.name}</span>
                 </span>
-                <span className="shrink-0 text-xs text-muted-foreground">
+                <span className="shrink-0 text-xs text-muted-foreground bg-white/50 px-2 py-0.5 rounded-full">
                   {CATEGORY_LABEL[item.category]}
                 </span>
               </li>
@@ -484,7 +485,7 @@ function OutfitOfTheDay({
           </ul>
 
           <div className="flex items-center gap-2 pt-1">
-            <Button className="flex-1 rounded-full" onClick={onOpen}>
+            <Button className="flex-1 rounded-full bg-primary hover:bg-primary/90" onClick={onOpen}>
               Носить сегодня
             </Button>
             <Button

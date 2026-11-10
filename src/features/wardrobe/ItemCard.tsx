@@ -63,10 +63,10 @@ export function ItemCard({
   return (
     <article
       className={cn(
-        "group relative flex flex-col rounded-3xl bg-slate-100 p-2.5 transition-[box-shadow,transform] duration-300 dark:bg-slate-800",
+        "group relative flex flex-col rounded-3xl bg-white p-2.5 transition-[box-shadow,transform] duration-300 ease-in-out dark:bg-slate-800",
         isSelected
           ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
-          : "shadow-[0_18px_40px_-30px_rgba(15,23,42,0.55)] hover:-translate-y-0.5 hover:shadow-[0_26px_48px_-28px_rgba(15,23,42,0.45)] dark:shadow-[0_18px_40px_-26px_rgba(0,0,0,0.9)] dark:hover:shadow-[0_26px_48px_-24px_rgba(0,0,0,0.95)]",
+          : "drop-shadow-[0_20px_50px_rgba(15,23,42,0.5)] hover:-translate-y-2 hover:drop-shadow-[0_20px_60px_rgba(15,23,42,0.4)] dark:drop-shadow-[0_18px_40px_-26px_rgba(0,0,0,0.9)] dark:hover:drop-shadow-[0_18px_40px_-20px_rgba(0,0,0,0.95)]",
         isBusy && "opacity-60",
       )}
     >
@@ -89,10 +89,10 @@ export function ItemCard({
         </span>
 
         <span className="block px-1 pb-1 pt-2.5">
-          <span className="block truncate text-sm font-medium leading-snug">
+          <span className="block truncate font-bold text-lg">
             {name}
           </span>
-          <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+          <span className="mt-0.5 block truncate text-sm text-muted-foreground">
             {itemTypeLabel(item)} · {item.color.label}
           </span>
         </span>
