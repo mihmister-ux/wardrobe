@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   CheckSquare,
   Plus,
+  SearchX,
   Shirt,
   X,
 } from "lucide-react";
@@ -20,6 +21,15 @@ import { BulkSlotDialog } from "@/features/wardrobe/BulkSlotDialog";
 import { DeleteItemDialog } from "@/features/wardrobe/DeleteItemDialog";
 import { EditItemSheet } from "@/features/wardrobe/EditItemSheet";
 import { ItemCard } from "@/features/wardrobe/ItemCard";
+import { WardrobeFilterBar } from "@/features/wardrobe/WardrobeFilterBar";
+import {
+  presentColors,
+  presentSlots,
+} from "@/features/wardrobe/filterItems";
+import {
+  useFilteredItems,
+  useWardrobeFilters,
+} from "@/features/wardrobe/useFilteredItems";
 import { useWardrobe } from "@/features/wardrobe/useWardrobe";
 
 export interface WardrobePageProps {
@@ -46,6 +56,16 @@ export default function WardrobePage({ onAddItem }: WardrobePageProps) {
   const [pendingDelete, setPendingDelete] = React.useState<Item | null>(null);
   const [editingItem, setEditingItem] = React.useState<Item | null>(null);
 
+  /* ------------------------- поиск и фильтры -------------------------- */
+
+  const [filters, filterActions] = useWardrobeFilters();
+  const visibleItems = useFilteredItems(items, filters);
+
+  // Чипы и кружки строим по факту: раздел без вещей и цвет, которого нет ни у
+  // одной вещи, ведут только в пустой список.
+  const filterSlots = React.useMemo(() => presentSlots(items), [items]);
+  const filterColors = React.useMemo(() => presentColors(items), [items]);
+
   /* ---------------------- массовое редактирование ---------------------- */
 
   const [isSelecting, setSelecting] = React.useState(false);
@@ -61,7 +81,11 @@ export default function WardrobePage({ onAddItem }: WardrobePageProps) {
     () => items.reduce((count, item) => count + (selectedIds.has(item.id) ? 1 : 0), 0),
     [items, selectedIds],
   );
-  const allSelected = total > 0 && selectedCount === total;
+  // «Выбрать все» относится к тому, что видно: с активным фильтром «Обувь»
+  // выделить заодно и все куртки — не то, чего ждёт человек.
+  const allSelected =
+    visibleItems.length > 0 &&
+    visibleItems.every((item) => selectedIds.has(item.id));
 
   const toggleSelecting = () => {
     setSelecting((value) => !value);
@@ -81,7 +105,8 @@ export default function WardrobePage({ onAddItem }: WardrobePageProps) {
     });
   };
 
-  const selectAll = () => setSelectedIds(new Set(items.map((item) => item.id)));
+  const selectAll = () =>
+    setSelectedIds(new Set(visibleItems.map((item) => item.id)));
   const clearSelection = () => setSelectedIds(new Set());
 
   const applyBulkSlot = async (slot: Slot) => {
@@ -206,6 +231,17 @@ export default function WardrobePage({ onAddItem }: WardrobePageProps) {
           </p>
         ) : null}
 
+        {!isLoading && total > 0 ? (
+          <WardrobeFilterBar
+            filters={filters}
+            actions={filterActions}
+            slots={filterSlots}
+            colors={filterColors}
+            found={visibleItems.length}
+            total={total}
+          />
+        ) : null}
+
         {isSelecting ? (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl bg-secondary/70 px-3 py-2.5">
             <p className="text-sm font-medium">
@@ -244,13 +280,15 @@ export default function WardrobePage({ onAddItem }: WardrobePageProps) {
           </section>
         ) : total === 0 ? (
           <EmptyWardrobe onAddItem={onAddItem} />
+        ) : visibleItems.length === 0 ? (
+          <NothingFound onReset={filterActions.reset} />
         ) : (
           <>
             <section
               aria-label="Вещи"
               className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4 lg:grid-cols-4"
             >
-              {items.map((item) => (
+              {visibleItems.map((item) => (
                 <ItemCard
                   key={item.id}
                   item={item}
@@ -340,6 +378,25 @@ export default function WardrobePage({ onAddItem }: WardrobePageProps) {
         />
       ) : null}
     </>
+  );
+}
+
+function NothingFound({ onReset }: { onReset: () => void }) {
+  return (
+    <section className="rounded-3xl border border-dashed border-border bg-card/60 px-6 py-9 text-center">
+      <div className="mx-auto grid size-14 place-items-center rounded-2xl bg-secondary text-muted-foreground">
+        <SearchX className="size-7" />
+      </div>
+
+      <h2 className="mt-4 font-serif text-base font-semibold">Ничего не найдено</h2>
+      <p className="mx-auto mt-1 max-w-[19rem] text-sm text-muted-foreground">
+        Попробуйте изменить фильтры.
+      </p>
+
+      <Button className="mt-4 rounded-full" variant="outline" onClick={onReset}>
+        Сбросить
+      </Button>
+    </section>
   );
 }
 

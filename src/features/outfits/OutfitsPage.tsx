@@ -2,20 +2,24 @@
 
 import * as React from "react";
 import { Link } from "react-router-dom";
-import { Clock, Heart, Plus, Trash2 } from "lucide-react";
+import { BarChart3, Clock, Heart, Plus, Trash2 } from "lucide-react";
+import { useLiveQuery } from "dexie-react-hooks";
 
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { db } from "@/db/db";
 import { ItemPhoto } from "@/features/wardrobe/ItemPhoto";
 import type { Item } from "@/db/types";
 import { ColorDots } from "@/features/items/ColorDots";
 import { itemColorLabel } from "@/features/items/itemColors";
 import { itemName, slotLabel } from "@/features/items/itemView";
+import { WornStatsTab } from "@/features/outfits/WornStatsTab";
 import { useSavedOutfits, type ResolvedSavedOutfit } from "@/features/outfits/useSavedOutfits";
 import { useWornHistory, type ResolvedWornEntry } from "@/features/outfits/useWornHistory";
+import { useWornStats } from "@/features/outfits/useWornStats";
 
 /* ========================================================================== */
 /*  Подписи                                                                   */
@@ -197,6 +201,14 @@ function EmptyHistory() {
 export default function OutfitsPage() {
   const { outfits, isLoading, error, remove } = useSavedOutfits();
   const { entries: wornEntries, isLoading: isWornLoading } = useWornHistory();
+
+  // Статистике нужны «сырые» источники: все вещи и сам журнал (по itemIds).
+  // Отдельные подписки дешевле, чем восстановление журнала из записей,
+  // и не мешают вкладке «История» жить своей жизнью.
+  const statsItems = useLiveQuery(() => db.items.toArray(), []);
+  const statsHistory = useLiveQuery(() => db.wornHistory.toArray(), []);
+  const stats = useWornStats(statsItems, statsHistory);
+
   const [tab, setTab] = React.useState("saved");
   const [openId, setOpenId] = React.useState<string | null>(null);
   const [openWornId, setOpenWornId] = React.useState<number | null>(null);
@@ -220,6 +232,10 @@ export default function OutfitsPage() {
             <TabsTrigger value="history" id="tab-history">
               <Clock className="size-4" />
               История
+            </TabsTrigger>
+            <TabsTrigger value="stats" id="tab-stats">
+              <BarChart3 className="size-4" />
+              Статистика
             </TabsTrigger>
           </TabsList>
 
@@ -293,6 +309,26 @@ export default function OutfitsPage() {
                   />
                 ))}
               </section>
+            )}
+          </TabsContent>
+
+          <TabsContent value="stats">
+            {stats.isLoading ? (
+              <section
+                aria-busy="true"
+                aria-label="Считаем статистику"
+                className="space-y-6"
+              >
+                <div className="space-y-2.5">
+                  {Array.from({ length: 3 }, (_, index) => (
+                    <div key={index} className="rounded-2xl bg-card p-3 shadow-sm">
+                      <div className="h-14 animate-pulse rounded-xl bg-muted" />
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ) : (
+              <WornStatsTab stats={stats} />
             )}
           </TabsContent>
         </Tabs>
