@@ -1,11 +1,12 @@
  import Dexie, { type Table } from 'dexie';
-import type { Item, Photo, Settings } from './types';
+import type { Item, Photo, SavedOutfit, Settings } from './types';
 import { guessItemColor, isPlaceholderColor } from '../features/items/guessColor';
 
 export class WardrobeDB extends Dexie {
   items!: Table<Item, string>;
   photos!: Table<Photo, string>;
   settings!: Table<Settings, string>;
+  savedOutfits!: Table<SavedOutfit, string>;
 
   constructor() {
     super('wardrobe');
@@ -34,6 +35,15 @@ export class WardrobeDB extends Dexie {
             item.color = guessItemColor(item.label ?? "");
           });
       });
+
+    // v3: сохранённые образы — набор id вещей + оценка. Вещи храним по ссылке,
+    // чтобы образ жил вместе с гардеробом, а удаление одной вещи не ломало запись.
+    this.version(3).stores({
+      items: 'id, type, slot, status, createdAt, lastWornAt, [status+slot], *occasions, *tags',
+      photos: 'id, itemId',
+      settings: 'id',
+      savedOutfits: 'id, createdAt',
+    });
   }
 }
 

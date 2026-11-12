@@ -30,6 +30,7 @@ import { formatItemRange, itemName, SLOT_EMOJI } from "@/features/items/itemView
 import type { OutfitScore } from "@/features/home/scoreOutfit";
 import { useHomeOutfits } from "@/features/home/useHomeOutfits";
 import { useWeather } from "@/features/home/useWeather";
+import { saveOutfit } from "@/features/outfits/useSavedOutfits";
 import { useUserName } from "@/features/settings/useUserName";
 import { ItemPhoto } from "@/features/wardrobe/ItemPhoto";
 import { cn } from "@/lib/utils";
@@ -358,6 +359,7 @@ function OutfitOfTheDay({
   outfit,
   situation,
   onOpen,
+  onSave,
   onRegenerate,
   isRegenerating = false,
 }: {
@@ -365,6 +367,8 @@ function OutfitOfTheDay({
   /** Подпись выбранной ситуации — в пояснении к оценке. */
   situation: string;
   onOpen?: () => void;
+  /** Сохранить в «Образы»; вернёт true, если записалось (нет дубля). */
+  onSave?: () => Promise<boolean> | void;
   onRegenerate?: () => void;
   isRegenerating?: boolean;
 }) {
@@ -408,8 +412,11 @@ function OutfitOfTheDay({
           <button
             type="button"
             aria-pressed={saved}
-            aria-label={saved ? "Убрать из избранного" : "Добавить в избранное"}
-            onClick={() => setSaved((v) => !v)}
+            aria-label={saved ? "Образ сохранён" : "Сохранить образ"}
+            onClick={async () => {
+              const savedNow = await onSave?.();
+              if (savedNow !== false) setSaved(true);
+            }}
             className="absolute left-3 top-3 grid size-9 place-items-center rounded-full bg-background/60 text-slate-900 backdrop-blur-sm transition hover:bg-background/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <Heart className={cn("size-4", saved && "fill-rose-500 text-rose-500")} />
@@ -761,11 +768,18 @@ export default function HomePage({ onAddItem, onOpenOutfit }: HomePageProps) {
               <OutfitSkeleton />
             ) : outfitOfTheDay ? (
               <OutfitOfTheDay
+                key={outfitOfTheDay.id}
                 outfit={outfitOfTheDay}
                 situation={OCCASION_MAP[occasion].label}
                 isRegenerating={isRegenerating}
                 onRegenerate={regenerate}
                 onOpen={() => onOpenOutfit?.(outfitOfTheDay)}
+                onSave={() =>
+                  saveOutfit(
+                    outfitOfTheDay.items.map((entry) => entry.item),
+                    outfitOfTheDay.score,
+                  )
+                }
               />
             ) : (
               <EmptyOutfit onAddItem={onAddItem} />
