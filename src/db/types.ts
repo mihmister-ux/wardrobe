@@ -87,6 +87,23 @@ export interface SavedOutfit {
   createdAt: number;
 }
 
+/**
+ * Запись журнала ношения: какой набор вещей надели в какой день.
+ * `id` — автоинкремент Dexie (`++id`); при добавлении его не задаём.
+ * `date` нормализован к началу суток, чтобы «сегодня» сравнивалось по дню,
+ * а `createdAt` хранит точное время записи (для сортировки внутри дня).
+ */
+export interface WornHistory {
+  id?: number;
+  /** Начало дня ношения (timestamp, 00:00 локального времени). */
+  date: number;
+  /** id вещей в порядке отображения (top → bottom → shoes …). */
+  itemIds: string[];
+  /** Оценка образа 0..100 на момент ношения (может отсутствовать). */
+  outfitScore?: number;
+  createdAt: number;
+}
+
 // --- Вспомогательные типы для справочников (references.ts) ---
 
 export type IconKey = string; // Упрощаем, чтобы не было конфликтов

@@ -4,6 +4,7 @@ import { lazy, useState } from "react";
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import AppLayout from "./components/layout/AppLayout";
+import { Toaster } from "./components/ui/toast";
 import AddItemSheet from "./features/items/AddItemSheet";
 import HomePage from "./features/home/HomePage";
 import OnboardingDialog from "./features/onboarding/OnboardingDialog";
@@ -41,6 +42,9 @@ export default function App() {
 
       {/* Первый запуск: три слайда поверх приложения, пока нет флага. */}
       <OnboardingDialog />
+
+      {/* Уведомления — один контейнер на всё приложение. */}
+      <Toaster />
     </HashRouter>
   );
 }

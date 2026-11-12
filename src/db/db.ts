@@ -1,5 +1,5 @@
  import Dexie, { type Table } from 'dexie';
-import type { Item, Photo, SavedOutfit, Settings } from './types';
+import type { Item, Photo, SavedOutfit, Settings, WornHistory } from './types';
 import { guessItemColor, isPlaceholderColor } from '../features/items/guessColor';
 import { itemColorFamilies } from '../features/items/itemColors';
 
@@ -8,6 +8,7 @@ export class WardrobeDB extends Dexie {
   photos!: Table<Photo, string>;
   settings!: Table<Settings, string>;
   savedOutfits!: Table<SavedOutfit, string>;
+  wornHistory!: Table<WornHistory, number>;
 
   constructor() {
     super('wardrobe');
@@ -78,6 +79,17 @@ export class WardrobeDB extends Dexie {
           `[wardrobe] db v4: colors перенесены у ${migrated} из ${next.length} вещей`,
         );
       });
+
+    // v5: журнал ношения. Новая таблица `wornHistory` (автоинкремент), старые
+    // таблицы не меняем — миграция Dexie просто создаёт её рядом, поэтому
+    // гардероб и сохранённые образы остаются на месте.
+    this.version(5).stores({
+      items: 'id, type, slot, status, createdAt, lastWornAt, [status+slot], *occasions, *tags',
+      photos: 'id, itemId',
+      settings: 'id',
+      savedOutfits: 'id, createdAt',
+      wornHistory: '++id, date, createdAt',
+    });
   }
 }
 

@@ -24,6 +24,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Reveal } from "@/components/ui/reveal";
+import { toast } from "@/components/ui/toast";
 import { OCCASION_MAP } from "@/db/seed/references";
 import type { Item, Occasion } from "@/db/types";
 import { ColorDots } from "@/features/items/ColorDots";
@@ -33,6 +34,7 @@ import type { OutfitScore } from "@/features/home/scoreOutfit";
 import { useHomeOutfits } from "@/features/home/useHomeOutfits";
 import { useWeather } from "@/features/home/useWeather";
 import { saveOutfit } from "@/features/outfits/useSavedOutfits";
+import { formatWornDay, recordWornOutfit } from "@/features/outfits/useWornHistory";
 import { useUserName } from "@/features/settings/useUserName";
 import { ItemPhoto } from "@/features/wardrobe/ItemPhoto";
 import { cn } from "@/lib/utils";
@@ -360,7 +362,6 @@ function SituationPicker({
 function OutfitOfTheDay({
   outfit,
   situation,
-  onOpen,
   onSave,
   onRegenerate,
   isRegenerating = false,
@@ -368,7 +369,6 @@ function OutfitOfTheDay({
   outfit: Outfit;
   /** Подпись выбранной ситуации — в пояснении к оценке. */
   situation: string;
-  onOpen?: () => void;
   /** Сохранить в «Образы»; вернёт true, если записалось (нет дубля). */
   onSave?: () => Promise<boolean> | void;
   onRegenerate?: () => void;
@@ -376,6 +376,17 @@ function OutfitOfTheDay({
 }) {
   const [saved, setSaved] = React.useState(false);
   const parts = outfit.scoreParts;
+
+  /** Отметить «носил сегодня»: пишем в журнал и показываем тост. */
+  const handleWear = async () => {
+    const recorded = await recordWornOutfit(
+      outfit.items.map((entry) => entry.item.id),
+      outfit.score,
+    );
+    if (recorded) {
+      toast(`Образ сохранён в историю: ${formatWornDay(Date.now())}`);
+    }
+  };
 
   return (
     <section className="space-y-3">
@@ -502,7 +513,7 @@ function OutfitOfTheDay({
           </ul>
 
           <div className="flex items-center gap-2 pt-1">
-            <Button className="flex-1 rounded-full" onClick={onOpen}>
+            <Button className="flex-1 rounded-full" onClick={handleWear}>
               Носить сегодня
             </Button>
             <Button
@@ -716,10 +727,9 @@ function WardrobePreview({ items, onAddItem }: { items: Item[]; onAddItem?: () =
 
 export interface HomePageProps {
   onAddItem?: () => void;
-  onOpenOutfit?: (outfit: Outfit) => void;
 }
 
-export default function HomePage({ onAddItem, onOpenOutfit }: HomePageProps) {
+export default function HomePage({ onAddItem }: HomePageProps) {
   const { name } = useUserName();
   const { weather, isFallback: isWeatherFallback } = useWeather();
   const [occasion, setOccasion] = React.useState<Occasion>(() => defaultOccasion());
@@ -789,7 +799,6 @@ export default function HomePage({ onAddItem, onOpenOutfit }: HomePageProps) {
                 situation={OCCASION_MAP[occasion].label}
                 isRegenerating={isRegenerating}
                 onRegenerate={regenerate}
-                onOpen={() => onOpenOutfit?.(outfitOfTheDay)}
                 onSave={() =>
                   saveOutfit(
                     outfitOfTheDay.items.map((entry) => entry.item),

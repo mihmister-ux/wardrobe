@@ -15,6 +15,7 @@ import { ColorDots } from "@/features/items/ColorDots";
 import { itemColorLabel } from "@/features/items/itemColors";
 import { itemName, slotLabel } from "@/features/items/itemView";
 import { useSavedOutfits, type ResolvedSavedOutfit } from "@/features/outfits/useSavedOutfits";
+import { useWornHistory, type ResolvedWornEntry } from "@/features/outfits/useWornHistory";
 
 /* ========================================================================== */
 /*  Подписи                                                                   */
@@ -96,6 +97,58 @@ function SavedOutfitCard({
 }
 
 /* ========================================================================== */
+/*  Строка истории ношения                                                    */
+/* ========================================================================== */
+
+function HistoryEntryCard({
+  entry,
+  onOpen,
+}: {
+  entry: ResolvedWornEntry;
+  onOpen: () => void;
+}) {
+  const thumbs = entry.items.slice(0, 4);
+  return (
+    <Card className="group">
+      <CardContent className="flex items-center gap-3 p-3">
+        <div className="grid w-24 shrink-0 grid-cols-2 gap-1">
+          {thumbs.map((item) => (
+            <div
+              key={item.id}
+              className="flex aspect-square items-center justify-center overflow-hidden rounded-lg border border-border/40 bg-[#fbf8f1] p-1.5 dark:bg-card"
+            >
+              <ItemPhoto item={item} className="h-full w-full object-contain" />
+            </div>
+          ))}
+        </div>
+
+        <div className="min-w-0 flex-1 space-y-1">
+          <p className="truncate font-mono text-sm font-semibold tabular-nums">
+            {formatDate(entry.date)}
+          </p>
+          {entry.outfitScore != null ? (
+            <p className="font-mono text-xs tabular-nums text-muted-foreground">
+              Оценка {Math.round(entry.outfitScore)}%
+            </p>
+          ) : null}
+          <p className="text-xs text-muted-foreground">
+            {entry.items.length} {entry.items.length === 1 ? "вещь" : "вещи"}
+          </p>
+        </div>
+
+        <Button
+          variant="outline"
+          className="h-9 shrink-0 rounded-full px-3"
+          onClick={onOpen}
+        >
+          Открыть
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ========================================================================== */
 /*  Пустые состояния                                                          */
 /* ========================================================================== */
 
@@ -128,7 +181,7 @@ function EmptyHistory() {
         <div className="grid size-14 place-items-center rounded-2xl bg-primary/10 text-primary">
           <Clock className="size-7" />
         </div>
-        <h3 className="mt-4 font-serif text-xl font-semibold">История пока пуста</h3>
+        <h3 className="mt-4 font-serif text-xl font-semibold">Пока ничего не носили…</h3>
         <p className="mt-1 max-w-[19rem] text-sm text-muted-foreground">
           Когда вы наденете образ и отметите «Носить сегодня», он появится здесь.
         </p>
@@ -143,9 +196,15 @@ function EmptyHistory() {
 
 export default function OutfitsPage() {
   const { outfits, isLoading, error, remove } = useSavedOutfits();
+  const { entries: wornEntries, isLoading: isWornLoading } = useWornHistory();
   const [tab, setTab] = React.useState("saved");
   const [openId, setOpenId] = React.useState<string | null>(null);
+  const [openWornId, setOpenWornId] = React.useState<number | null>(null);
   const openOutfit = openId ? outfits.find((o) => o.id === openId) ?? null : null;
+  const openWorn =
+    openWornId != null
+      ? wornEntries.find((e) => e.id === openWornId) ?? null
+      : null;
 
   return (
     <>
@@ -209,8 +268,32 @@ export default function OutfitsPage() {
             )}
           </TabsContent>
 
-          <TabsContent value="history">
-            <EmptyHistory />
+          <TabsContent value="history" className="space-y-3">
+            {isWornLoading ? (
+              <section
+                aria-busy="true"
+                aria-label="Загружаем историю"
+                className="space-y-3"
+              >
+                {Array.from({ length: 2 }, (_, index) => (
+                  <div key={index} className="rounded-2xl bg-card p-3 shadow-sm">
+                    <div className="h-16 animate-pulse rounded-xl bg-muted" />
+                  </div>
+                ))}
+              </section>
+            ) : wornEntries.length === 0 ? (
+              <EmptyHistory />
+            ) : (
+              <section aria-label="История ношения" className="space-y-3">
+                {wornEntries.map((entry) => (
+                  <HistoryEntryCard
+                    key={entry.id}
+                    entry={entry}
+                    onOpen={() => setOpenWornId(entry.id)}
+                  />
+                ))}
+              </section>
+            )}
           </TabsContent>
         </Tabs>
 
@@ -238,6 +321,62 @@ export default function OutfitsPage() {
 
               <ul className="space-y-2">
                 {openOutfit.items.map((item) => (
+                  <li
+                    key={item.id}
+                    className="flex items-center gap-3 rounded-xl bg-muted/40 px-3 py-2"
+                  >
+                    <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-lg bg-background/70">
+                      <ItemPhoto
+                        item={item}
+                        className="h-full w-full object-contain"
+                      />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">
+                        {itemName(item)}
+                      </p>
+                      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <ColorDots item={item} size="sm" className="shrink-0" />
+                        <span className="truncate">{itemColorLabel(item)}</span>
+                      </p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-background/60 px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
+                      {slotLabel(item.slot)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </Dialog>
+
+        {/* Детали записи журнала: что надели в этот день. */}
+        <Dialog
+          open={openWorn !== null}
+          onClose={() => setOpenWornId(null)}
+          title={openWorn ? formatDate(openWorn.date) : ""}
+        >
+          {openWorn ? (
+            <div className="space-y-4">
+              <OutfitThumb items={openWorn.items} />
+
+              <div>
+                <h2 className="font-serif text-xl font-semibold leading-tight">
+                  {formatDate(openWorn.date)}
+                </h2>
+                {openWorn.outfitScore != null ? (
+                  <div className="mt-1 flex items-center gap-2 font-mono text-xs tabular-nums text-muted-foreground">
+                    <span className="font-semibold text-foreground">
+                      {Math.round(openWorn.outfitScore)}%
+                    </span>
+                    <span aria-hidden>·</span>
+                    <span>оценка на момент ношения</span>
+                  </div>
+                ) : null}
+              </div>
+
+              <ul className="space-y-2">
+                {openWorn.items.map((item) => (
                   <li
                     key={item.id}
                     className="flex items-center gap-3 rounded-xl bg-muted/40 px-3 py-2"
