@@ -55,9 +55,9 @@ async function compressImage(file: File): Promise<CompressedImage> {
 
 export interface AddItemSheetProps { open: boolean; onOpenChange: (open: boolean) => void; onSaved?: (item: Item) => void; }
 
-interface FormState { photo: CompressedImage | null; previewUrl: string | null; typeId: string | null; seasons: SeasonId[]; primary: ColorFamily | null; secondary: ColorFamily | null; label: string; isSaving: boolean; error: string | null; }
+interface FormState { photo: CompressedImage | null; previewUrl: string | null; typeId: string | null; seasons: SeasonId[]; primary: ColorFamily | null; secondary: ColorFamily | null; tertiary: ColorFamily | null; label: string; isSaving: boolean; error: string | null; }
 
-const INITIAL: FormState = { photo: null, previewUrl: null, typeId: null, seasons: [], primary: null, secondary: null, label: "", isSaving: false, error: null };
+const INITIAL: FormState = { photo: null, previewUrl: null, typeId: null, seasons: [], primary: null, secondary: null, tertiary: null, label: "", isSaving: false, error: null };
 
 export default function AddItemSheet({ open, onOpenChange, onSaved }: AddItemSheetProps) {
   const [form, setForm] = React.useState<FormState>(INITIAL);
@@ -106,7 +106,7 @@ export default function AddItemSheet({ open, onOpenChange, onSaved }: AddItemShe
     const defaults = buildItemDefaults(form.typeId);
     const range = mergeSeasonRanges(form.seasons);
     if (!type || !defaults || !range) return;
-    const colors = combineColors(form.primary, form.secondary);
+    const colors = combineColors(form.primary, form.secondary, form.tertiary);
     setForm((s) => ({ ...s, isSaving: true, error: null }));
     try {
       const now = Date.now();
@@ -250,8 +250,9 @@ export default function AddItemSheet({ open, onOpenChange, onSaved }: AddItemShe
                   setForm((s) => ({
                     ...s,
                     primary,
-                    // Дополнительный не может совпасть с основным.
+                    // Дополнительный и третий не могут совпасть с основным.
                     secondary: s.secondary === primary ? null : s.secondary,
+                    tertiary: s.tertiary === primary ? null : s.tertiary,
                     error: null,
                   }));
                 }}
@@ -261,16 +262,45 @@ export default function AddItemSheet({ open, onOpenChange, onSaved }: AddItemShe
                 id="new-item-color-secondary"
                 label="Дополнительный"
                 value={form.secondary}
-                onChange={(secondary) => setField("secondary", secondary)}
+                onChange={(secondary) =>
+                  setForm((s) => ({
+                    ...s,
+                    secondary,
+                    // Не даём третьему цвету повторять новый дополнительный.
+                    tertiary:
+                      secondary && s.tertiary === secondary
+                        ? null
+                        : s.tertiary,
+                    error: null,
+                  }))
+                }
                 allowEmpty
                 emptyLabel="Нет"
                 exclude={form.primary ? [form.primary] : []}
                 disabled={form.isSaving}
               />
+              <ColorPicker
+                id="new-item-color-tertiary"
+                label="Третий цвет"
+                value={form.tertiary}
+                onChange={(tertiary) => setField("tertiary", tertiary)}
+                allowEmpty
+                emptyLabel="Нет"
+                exclude={
+                  form.secondary
+                    ? [form.primary, form.secondary].filter(
+                        (family): family is ColorFamily => family !== null,
+                      )
+                    : form.primary
+                      ? [form.primary]
+                      : []
+                }
+                disabled={form.isSaving}
+              />
             </div>
             <p className="text-xs text-muted-foreground">
-              Второй цвет — для двухцветных вещей: полоски, контрастные рукава,
-              отделка. Его можно не выбирать.
+              Второй и третий цвета — для вещей с узором или отделкой: полоски,
+              контрастные рукава, кант. Оба можно не выбирать.
             </p>
           </div>
 

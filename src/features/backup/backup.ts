@@ -285,7 +285,7 @@ function sanitizeItem(value: unknown): Item | null {
   const slot = VALID_SLOTS.find((candidate) => candidate === value.slot);
   if (!id || !type || !slot) return null;
 
-  // Схема v4: цветов 1–2. Резервные копии старого формата хранили один цвет
+  // Схема v4: цветов 1–3. Резервные копии старого формата хранили один цвет
   // объектом в `color` — читаем его как запасной вариант и не теряем данные.
   const colors = sanitizeColors(value.colors);
   if (colors.length === 0 && isRecord(value.color)) {

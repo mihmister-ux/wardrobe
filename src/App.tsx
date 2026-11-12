@@ -6,6 +6,7 @@ import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import AppLayout from "./components/layout/AppLayout";
 import AddItemSheet from "./features/items/AddItemSheet";
 import HomePage from "./features/home/HomePage";
+import OnboardingDialog from "./features/onboarding/OnboardingDialog";
 import { useTheme } from "./features/settings/useTheme";
 
 /**
@@ -37,6 +38,9 @@ export default function App() {
       </Routes>
 
       <AddItemSheet open={isAddItemOpen} onOpenChange={setAddItemOpen} />
+
+      {/* Первый запуск: три слайда поверх приложения, пока нет флага. */}
+      <OnboardingDialog />
     </HashRouter>
   );
 }

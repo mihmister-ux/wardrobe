@@ -1,9 +1,11 @@
 "use client";
 
-import { Plus, Sparkles } from "lucide-react";
+import { useState } from "react";
+import { BookOpen, Plus, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { DOCK_TABS, useActiveTab, type DockTab } from "@/components/layout/navigation";
+import { InstructionDialog } from "@/features/onboarding/InstructionDialog";
 import { cn } from "@/lib/utils";
 
 export interface SideNavProps {
@@ -18,6 +20,7 @@ export interface SideNavProps {
 export function SideNav({ onAddItem, tabs = DOCK_TABS }: SideNavProps) {
   const navigate = useNavigate();
   const activeId = useActiveTab(tabs);
+  const [isInstructionOpen, setInstructionOpen] = useState(false);
 
   return (
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r border-border/60 bg-background/75 backdrop-blur-xl md:flex">
@@ -56,6 +59,16 @@ export function SideNav({ onAddItem, tabs = DOCK_TABS }: SideNavProps) {
             </button>
           );
         })}
+
+        {/* Пятый пункт — не страница, а модалка «Инструкция». */}
+        <button
+          type="button"
+          onClick={() => setInstructionOpen(true)}
+          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <BookOpen className="size-4.5" />
+          Инструкция
+        </button>
       </nav>
 
       <div className="border-t border-border/60 p-3">
@@ -71,6 +84,11 @@ export function SideNav({ onAddItem, tabs = DOCK_TABS }: SideNavProps) {
           Фото, тип, сезон — и вещь сразу в образе.
         </p>
       </div>
+
+      <InstructionDialog
+        open={isInstructionOpen}
+        onClose={() => setInstructionOpen(false)}
+      />
     </aside>
   );
 }

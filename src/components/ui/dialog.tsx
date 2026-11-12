@@ -1,4 +1,5 @@
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -36,7 +37,11 @@ export function Dialog({ open, onClose, title, children, className }: DialogProp
 
   if (!open) return null;
 
-  return (
+  // Портал в <body>: иначе `fixed inset-0` цепляется за ближайший containing
+  // block. Например, «Инструкция» живёт внутри <aside> с backdrop-blur, а
+  // backdrop-filter делает предка containing block'ом для fixed-потомков —
+  // и диалог растягивался не на экран, а на 240px сайдбара.
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4"
       role="dialog"
@@ -69,6 +74,7 @@ export function Dialog({ open, onClose, title, children, className }: DialogProp
         </button>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

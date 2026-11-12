@@ -39,6 +39,7 @@ interface FormState {
   seasons: SeasonId[];
   primary: ColorFamily;
   secondary: ColorFamily | null;
+  tertiary: ColorFamily | null;
   colorHint: string | null;
   pattern: Pattern;
   texture: Texture;
@@ -55,6 +56,7 @@ function initialForm(item: Item): FormState {
     seasons: seasonsForRange(item.tempMin, item.tempMax),
     primary: colors[0]!,
     secondary: colors[1] ?? null,
+    tertiary: colors[2] ?? null,
     colorHint: null,
     pattern: item.pattern,
     texture: item.texture,
@@ -111,28 +113,62 @@ export function EditItemSheet({ item, onClose }: EditItemSheetProps) {
     }));
   };
 
-  /** Основной цвет обязателен. Если он совпал с дополнительным — второй убираем. */
+  /** Основной цвет обязателен. Если он совпал с дополнительным или третьим — те убираем. */
   const handlePrimaryColor = (primary: ColorFamily | null) => {
     if (!primary) return;
-    setForm((state) => ({
-      ...state,
-      primary,
-      secondary: state.secondary === primary ? null : state.secondary,
-      colorHint:
-        state.secondary === primary
-          ? "Дополнительный цвет совпадал с основным — мы его убрали."
+    setForm((state) => {
+      const secondary = state.secondary === primary ? null : state.secondary;
+      const tertiary = state.tertiary === primary ? null : state.tertiary;
+      const changed = secondary !== state.secondary || tertiary !== state.tertiary;
+      return {
+        ...state,
+        primary,
+        secondary,
+        tertiary,
+        colorHint: changed
+          ? "Совпадавшие цвета пришлось убрать — они не могут повторять основной."
           : null,
-      error: null,
-    }));
+        error: null,
+      };
+    });
   };
 
   const handleSecondaryColor = (secondary: ColorFamily | null) => {
+    setForm((state) => {
+      if (secondary && secondary === state.primary) {
+        return {
+          ...state,
+          colorHint: "Дополнительный цвет не может совпадать с основным.",
+          error: null,
+        };
+      }
+      // Если новый дополнительный цвет совпал с уже выбранным третьим —
+      // третий сбрасываем, чтобы не было двух одинаковых.
+      const tertiary =
+        secondary && state.tertiary === secondary ? null : state.tertiary;
+      return {
+        ...state,
+        secondary,
+        tertiary,
+        colorHint:
+          tertiary !== state.tertiary
+            ? "Третий цвет совпадал с новым дополнительным — мы его убрали."
+            : null,
+        error: null,
+      };
+    });
+  };
+
+  const handleTertiaryColor = (tertiary: ColorFamily | null) => {
     setForm((state) => ({
       ...state,
-      secondary: secondary && secondary !== state.primary ? secondary : null,
+      tertiary:
+        tertiary && tertiary !== state.primary && tertiary !== state.secondary
+          ? tertiary
+          : null,
       colorHint:
-        secondary && secondary === state.primary
-          ? "Дополнительный цвет не может совпадать с основным."
+        tertiary && (tertiary === state.primary || tertiary === state.secondary)
+          ? "Третий цвет не может совпадать с уже выбранными."
           : null,
       error: null,
     }));
@@ -161,7 +197,7 @@ export function EditItemSheet({ item, onClose }: EditItemSheetProps) {
         label: label || undefined,
         slot: form.slot,
         type: form.type,
-        colors: combineColors(form.primary, form.secondary),
+        colors: combineColors(form.primary, form.secondary, form.tertiary),
         pattern: form.pattern,
         texture: form.texture,
         warmth: range.warmth,
@@ -339,6 +375,20 @@ export function EditItemSheet({ item, onClose }: EditItemSheetProps) {
                 exclude={[form.primary]}
                 disabled={form.isSaving}
               />
+              <ColorPicker
+                id="item-color-tertiary"
+                label="Третий цвет"
+                value={form.tertiary}
+                onChange={handleTertiaryColor}
+                allowEmpty
+                emptyLabel="Нет"
+                exclude={
+                  form.secondary
+                    ? [form.primary, form.secondary]
+                    : [form.primary]
+                }
+                disabled={form.isSaving}
+              />
             </div>
             {form.colorHint ? (
               <p role="status" className="text-xs text-muted-foreground">
@@ -346,8 +396,8 @@ export function EditItemSheet({ item, onClose }: EditItemSheetProps) {
               </p>
             ) : (
               <p className="text-xs text-muted-foreground">
-                Второй цвет нужен двухцветным вещам: полоски, контрастные рукава,
-                отделка.
+                Второй и третий цвета нужны вещам с узором или отделкой: полоски,
+                контрастные рукава, кант. Их можно не выбирать.
               </p>
             )}
           </div>

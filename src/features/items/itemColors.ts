@@ -3,10 +3,10 @@
 /**
  * Цвета вещи: сколько их, как их подписать и как показать.
  *
- * С версии схемы v4 у вещи не один цвет, а массив `colors` (1–2 семейства из
- * справочника): полосатая майка или свитер с контрастными рукавами — обычное
- * дело. Утилиты ниже прячут от интерфейса две вещи, о которых иначе пришлось
- * бы помнить в каждом компоненте:
+ * С версии схемы v4 у вещи не один цвет, а массив `colors` (1–3 семейства из
+ * справочника): полосатая майка, свитер с контрастными рукавами или вещь с
+ * цветной отделкой — обычное дело. Утилиты ниже прячут от интерфейса две вещи,
+ * о которых иначе пришлось бы помнить в каждом компоненте:
  *
  *   1. цвет в базе — семейство (`"black"`), а для показа нужны HEX и подпись.
  *      Их берём из COLOR_MAP, чтобы справочник оставался единственным
@@ -18,8 +18,8 @@
 import { COLOR_MAP } from "@/db/seed/references";
 import type { ColorFamily, ItemColor } from "@/db/types";
 
-/** Больше двух цветов у вещи не бывает: их количество задано дизайном. */
-export const MAX_ITEM_COLORS = 2;
+/** Больше трёх цветов у вещи не бывает: это предел дизайна и формы. */
+export const MAX_ITEM_COLORS = 3;
 
 /** Запасной цвет для совсем пустых записей — нейтральный, не бросается в глаза. */
 const FALLBACK_FAMILY: ColorFamily = "gray";
@@ -45,7 +45,7 @@ export interface ColorSource {
 }
 
 /**
- * Семейства цветов вещи: основное первым, без повторов, максимум два.
+ * Семейства цветов вещи: основное первым, без повторов, максимум три.
  * Пустой или битый набор не оставляет вещь «бесцветной» — подставляем нейтраль.
  */
 export function itemColorFamilies(source: ColorSource): ColorFamily[] {
@@ -79,13 +79,17 @@ export function itemColorLabel(source: ColorSource): string {
 }
 
 /**
- * Собирает `colors` из выбора в форме. Дополнительный цвет не может совпадать
- * с основным: если совпал — вещь остаётся одноцветной.
+ * Собирает `colors` из выбора в форме. Цвета не могут совпадать: повтор в
+ * дополнительном или третьем просто отбрасывается, основное остаётся первым.
  */
 export function combineColors(
   primary: ColorFamily | null,
   secondary: ColorFamily | null,
+  tertiary: ColorFamily | null = null,
 ): ColorFamily[] {
-  if (!primary) return [];
-  return secondary && secondary !== primary ? [primary, secondary] : [primary];
+  const families: ColorFamily[] = [];
+  for (const family of [primary, secondary, tertiary]) {
+    if (family && !families.includes(family)) families.push(family);
+  }
+  return families;
 }
