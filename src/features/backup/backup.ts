@@ -17,9 +17,9 @@
 
 import { db } from "@/db/db";
 import type {
+  ColorFamily,
   Formality,
   Item,
-  ItemColor,
   ItemStatus,
   Occasion,
   Pattern,
@@ -29,6 +29,8 @@ import type {
   Texture,
   Warmth,
 } from "@/db/types";
+import { COLORS } from "@/db/seed/references";
+import { MAX_ITEM_COLORS } from "@/features/items/itemColors";
 
 export const BACKUP_APP = "wardrobe";
 export const BACKUP_VERSION = 1;
@@ -245,13 +247,34 @@ function asWaterResistance(value: unknown): 0 | 1 | 2 {
   return Math.min(2, Math.max(0, Math.round(asNumber(value, 0)))) as 0 | 1 | 2;
 }
 
-function sanitizeColor(value: unknown): ItemColor | null {
-  if (!isRecord(value)) return null;
-  const family = asString(value.family);
-  const hex = asString(value.hex);
-  const label = asString(value.label);
-  if (!family || !hex || !label) return null;
-  return { family, hex, label };
+/** Семейства, для которых в справочнике есть HEX и подпись. */
+const KNOWN_FAMILIES: ReadonlySet<string> = new Set(COLORS.map((color) => color.family));
+
+function sanitizeColorFamily(value: unknown): ColorFamily | null {
+  const family = asString(value);
+  return family && KNOWN_FAMILIES.has(family) ? (family as ColorFamily) : null;
+}
+
+/**
+ * `colors` в файле: массив семейств (текущий формат) либо массив объектов
+ * `{ family, hex, label }` — так поле выглядело в промежуточных сборках.
+ * Порядок сохраняем, дубликаты и лишние цвета отбрасываем.
+ */
+function sanitizeColors(value: unknown): ColorFamily[] {
+  const families: ColorFamily[] = [];
+  if (!Array.isArray(value)) return families;
+
+  for (const entry of value) {
+    const family =
+      typeof entry === "string"
+        ? sanitizeColorFamily(entry)
+        : isRecord(entry)
+          ? sanitizeColorFamily(entry.family)
+          : null;
+    if (family && !families.includes(family)) families.push(family);
+  }
+
+  return families.slice(0, MAX_ITEM_COLORS);
 }
 
 function sanitizeItem(value: unknown): Item | null {
@@ -260,8 +283,16 @@ function sanitizeItem(value: unknown): Item | null {
   const id = asString(value.id);
   const type = asString(value.type);
   const slot = VALID_SLOTS.find((candidate) => candidate === value.slot);
-  const color = sanitizeColor(value.color);
-  if (!id || !type || !slot || !color) return null;
+  if (!id || !type || !slot) return null;
+
+  // Схема v4: цветов 1–2. Резервные копии старого формата хранили один цвет
+  // объектом в `color` — читаем его как запасной вариант и не теряем данные.
+  const colors = sanitizeColors(value.colors);
+  if (colors.length === 0 && isRecord(value.color)) {
+    const legacy = sanitizeColorFamily(value.color.family);
+    if (legacy) colors.push(legacy);
+  }
+  if (colors.length === 0) colors.push("gray");
 
   const now = Date.now();
   return {
@@ -269,7 +300,7 @@ function sanitizeItem(value: unknown): Item | null {
     type,
     slot,
     label: asString(value.label) ?? undefined,
-    color,
+    colors,
     pattern: asEnum(value.pattern, VALID_PATTERNS, "solid"),
     texture: asEnum(value.texture, VALID_TEXTURES, "cotton"),
     warmth: asWarmth(value.warmth),

@@ -5,7 +5,6 @@ import { Loader2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
-  COLORS,
   PATTERNS,
   SLOTS,
   SLOT_MAP,
@@ -14,7 +13,9 @@ import {
   TYPE_MAP,
 } from "@/db/seed/references";
 import { db } from "@/db/db";
-import type { Item, ItemColor, Pattern, Slot, Texture } from "@/db/types";
+import type { ColorFamily, Item, Pattern, Slot, Texture } from "@/db/types";
+import { ColorPicker } from "@/features/items/ColorPicker";
+import { combineColors, itemColorFamilies } from "@/features/items/itemColors";
 import { SeasonPicker } from "@/features/items/SeasonPicker";
 import { SLOT_EMOJI, itemName } from "@/features/items/itemView";
 import {
@@ -36,7 +37,9 @@ interface FormState {
   slot: Slot;
   type: string;
   seasons: SeasonId[];
-  color: ItemColor;
+  primary: ColorFamily;
+  secondary: ColorFamily | null;
+  colorHint: string | null;
   pattern: Pattern;
   texture: Texture;
   isSaving: boolean;
@@ -44,12 +47,15 @@ interface FormState {
 }
 
 function initialForm(item: Item): FormState {
+  const colors = itemColorFamilies(item);
   return {
     label: item.label ?? "",
     slot: item.slot,
     type: item.type,
     seasons: seasonsForRange(item.tempMin, item.tempMax),
-    color: item.color,
+    primary: colors[0]!,
+    secondary: colors[1] ?? null,
+    colorHint: null,
     pattern: item.pattern,
     texture: item.texture,
     isSaving: false,
@@ -105,6 +111,33 @@ export function EditItemSheet({ item, onClose }: EditItemSheetProps) {
     }));
   };
 
+  /** Основной цвет обязателен. Если он совпал с дополнительным — второй убираем. */
+  const handlePrimaryColor = (primary: ColorFamily | null) => {
+    if (!primary) return;
+    setForm((state) => ({
+      ...state,
+      primary,
+      secondary: state.secondary === primary ? null : state.secondary,
+      colorHint:
+        state.secondary === primary
+          ? "Дополнительный цвет совпадал с основным — мы его убрали."
+          : null,
+      error: null,
+    }));
+  };
+
+  const handleSecondaryColor = (secondary: ColorFamily | null) => {
+    setForm((state) => ({
+      ...state,
+      secondary: secondary && secondary !== state.primary ? secondary : null,
+      colorHint:
+        secondary && secondary === state.primary
+          ? "Дополнительный цвет не может совпадать с основным."
+          : null,
+      error: null,
+    }));
+  };
+
   const canSave = !form.isSaving && form.seasons.length > 0;
 
   const handleSave = async () => {
@@ -128,7 +161,7 @@ export function EditItemSheet({ item, onClose }: EditItemSheetProps) {
         label: label || undefined,
         slot: form.slot,
         type: form.type,
-        color: form.color,
+        colors: combineColors(form.primary, form.secondary),
         pattern: form.pattern,
         texture: form.texture,
         warmth: range.warmth,
@@ -288,32 +321,35 @@ export function EditItemSheet({ item, onClose }: EditItemSheetProps) {
 
           <div className="space-y-2">
             <p className="text-sm font-medium">Цвет</p>
-            <div className="flex flex-wrap gap-1.5">
-              {COLORS.map((color) => {
-                const isSelected = form.color.family === color.family;
-                return (
-                  <button
-                    key={color.family}
-                    type="button"
-                    aria-pressed={isSelected}
-                    onClick={() => setField("color", color)}
-                    className={cn(
-                      "flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs transition",
-                      isSelected
-                        ? "border-primary bg-primary/10 text-foreground"
-                        : "border-border text-muted-foreground hover:border-primary/40",
-                    )}
-                  >
-                    <span
-                      className="size-3.5 rounded-full border border-border"
-                      style={{ backgroundColor: color.hex }}
-                      aria-hidden
-                    />
-                    {color.label}
-                  </button>
-                );
-              })}
+            <div className="grid grid-cols-2 gap-2">
+              <ColorPicker
+                id="item-color-primary"
+                label="Основной"
+                value={form.primary}
+                onChange={handlePrimaryColor}
+                disabled={form.isSaving}
+              />
+              <ColorPicker
+                id="item-color-secondary"
+                label="Дополнительный"
+                value={form.secondary}
+                onChange={handleSecondaryColor}
+                allowEmpty
+                emptyLabel="Нет"
+                exclude={[form.primary]}
+                disabled={form.isSaving}
+              />
             </div>
+            {form.colorHint ? (
+              <p role="status" className="text-xs text-muted-foreground">
+                {form.colorHint}
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Второй цвет нужен двухцветным вещам: полоски, контрастные рукава,
+                отделка.
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">

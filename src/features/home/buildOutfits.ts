@@ -10,6 +10,7 @@
 
 import type { Item, Occasion, Slot } from "@/db/types";
 import { assessPalette, type HarmonyId, type PalettePiece } from "@/generator/colors";
+import { itemColors } from "@/features/items/itemColors";
 import { itemName, itemTypeLabel } from "@/features/items/itemView";
 import { scoreOutfit } from "@/features/home/scoreOutfit";
 import type { Outfit as UiOutfit } from "@/features/home/HomePage";
@@ -141,7 +142,7 @@ export function buildOutfits({
 
     const pieces: PalettePiece[] = picked.map((item) => ({
       role: item.slot,
-      color: { family: item.color.family, hex: item.color.hex, label: item.color.label },
+      colors: itemColors(item),
     }));
     const assessment = assessPalette(pieces);
     const score = scoreOutfit(picked, assessment.score, temperature, occasion);
@@ -154,7 +155,9 @@ export function buildOutfits({
         .join(" + "),
       note: assessment.detail,
       harmony: assessment.label,
-      palette: [...new Set(picked.map((item) => item.color.hex))].slice(0, 4),
+      palette: [
+        ...new Set(picked.flatMap((item) => itemColors(item).map((color) => color.hex))),
+      ].slice(0, 4),
       score: score.total,
       scoreParts: score,
       tags: [seasonLabel(temperature), `${tempText(temperature)}°`],

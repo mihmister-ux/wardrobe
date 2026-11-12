@@ -34,19 +34,22 @@ const WORD_TO_FAMILY: ReadonlyArray<[RegExp, ColorFamily]> = [
 
 /** Цвет по названию вещи; серый — безопасный нейтральный запасной вариант. */
 export function guessItemColor(name: string): ItemColor {
+  const family = guessItemColorFamily(name);
+  const color = COLOR_MAP[family];
+  return { family: color.family, hex: color.hex, label: color.label };
+}
+
+/** То же угадывание, но только семейством — так цвета хранятся с версии v4. */
+export function guessItemColorFamily(name: string): ColorFamily {
   const normalized = name.trim().toLowerCase();
 
   if (normalized) {
     for (const [pattern, family] of WORD_TO_FAMILY) {
-      if (pattern.test(normalized)) {
-        const color = COLOR_MAP[family];
-        return { family: color.family, hex: color.hex, label: color.label };
-      }
+      if (pattern.test(normalized)) return family;
     }
   }
 
-  const gray = COLOR_MAP.gray;
-  return { family: gray.family, hex: gray.hex, label: gray.label };
+  return "gray";
 }
 
 /**

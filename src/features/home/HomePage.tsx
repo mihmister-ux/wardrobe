@@ -26,6 +26,8 @@ import { Button } from "@/components/ui/button";
 import { Reveal } from "@/components/ui/reveal";
 import { OCCASION_MAP } from "@/db/seed/references";
 import type { Item, Occasion } from "@/db/types";
+import { ColorDots } from "@/features/items/ColorDots";
+import { itemColorLabel } from "@/features/items/itemColors";
 import { formatItemRange, itemName, SLOT_EMOJI } from "@/features/items/itemView";
 import type { OutfitScore } from "@/features/home/scoreOutfit";
 import { useHomeOutfits } from "@/features/home/useHomeOutfits";
@@ -484,7 +486,13 @@ function OutfitOfTheDay({
                   <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-background/70">
                     <ItemPhoto item={entry.item} className="h-full w-full object-contain" />
                   </span>
-                  <span className="truncate font-medium">{entry.name}</span>
+                  <span className="flex min-w-0 flex-col">
+                    <span className="truncate font-medium">{entry.name}</span>
+                    <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <ColorDots item={entry.item} size="sm" />
+                      <span className="truncate">{itemColorLabel(entry.item)}</span>
+                    </span>
+                  </span>
                 </span>
                 <span className="shrink-0 rounded-full bg-background/60 px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
                   {CATEGORY_LABEL[entry.category]}
@@ -613,8 +621,11 @@ function Alternatives({
                 <span className="mt-1.5 line-clamp-2 px-0.5 text-[11px] font-medium leading-tight">
                   {outfit.title}
                 </span>
-                <span className="block px-0.5 font-mono text-[10px] tabular-nums text-muted-foreground">
-                  {outfit.score}%
+                <span className="mt-1 flex items-center justify-between gap-1 px-0.5">
+                  {main ? <ColorDots item={main.item} size="sm" /> : <span aria-hidden />}
+                  <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
+                    {outfit.score}%
+                  </span>
                 </span>
               </button>
             );
@@ -675,16 +686,16 @@ function WardrobePreview({ items, onAddItem }: { items: Item[]; onAddItem?: () =
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{itemName(item)}</p>
-                <p className="text-xs text-muted-foreground">
-                  {item.color.label} ·{" "}
-                  <span className="font-mono tabular-nums">{formatItemRange(item)}</span>
+                <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <ColorDots item={item} size="sm" className="shrink-0" />
+                  <span className="truncate">
+                    {itemColorLabel(item)} ·{" "}
+                    <span className="font-mono tabular-nums">
+                      {formatItemRange(item)}
+                    </span>
+                  </span>
                 </p>
               </div>
-              <span
-                className="size-4 shrink-0 rounded-full border border-border"
-                style={{ backgroundColor: item.color.hex }}
-                aria-hidden
-              />
             </li>
           ))}
         </ul>
@@ -730,9 +741,10 @@ export default function HomePage({ onAddItem, onOpenOutfit }: HomePageProps) {
 
   return (
     <>
+      {/* Дата остаётся сверху, в шапке; имя — крупным блоком ниже, в потоке. */}
       <PageHeader
         eyebrow={todayLabel}
-        title={`Привет, ${userName} 👋`}
+        eyebrowClassName="font-mono text-[12px] uppercase tracking-[0.08em]"
         action={
           <div className="grid size-11 place-items-center rounded-full bg-gradient-to-br from-amber-300 to-rose-300 font-serif text-sm font-semibold text-white shadow-sm">
             {userInitial}
@@ -741,6 +753,10 @@ export default function HomePage({ onAddItem, onOpenOutfit }: HomePageProps) {
       />
 
       <main className="space-y-6">
+        <h1 className="greeting-shimmer font-serif text-[52px] font-semibold leading-[1.05] tracking-tight text-balance sm:text-[56px]">
+          Привет, {userName}
+        </h1>
+
         {/* Верхняя полоса: погода + ситуация. */}
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] lg:items-start">
           <Reveal>

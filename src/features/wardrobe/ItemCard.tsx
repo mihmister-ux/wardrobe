@@ -4,6 +4,8 @@ import * as React from "react";
 import { Check, EyeOff, MoreVertical, RotateCcw, Trash2 } from "lucide-react";
 
 import type { Item } from "@/db/types";
+import { ColorDots } from "@/features/items/ColorDots";
+import { itemColorLabel } from "@/features/items/itemColors";
 import { itemName, itemTypeLabel } from "@/features/items/itemView";
 import { ItemPhoto } from "@/features/wardrobe/ItemPhoto";
 import { cn } from "@/lib/utils";
@@ -92,8 +94,11 @@ export function ItemCard({
           <span className="block truncate font-bold text-lg">
             {name}
           </span>
-          <span className="mt-0.5 block truncate text-sm text-muted-foreground">
-            {itemTypeLabel(item)} · {item.color.label}
+          <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
+            <ColorDots item={item} className="shrink-0" />
+            <span className="truncate">
+              {itemTypeLabel(item)} · {itemColorLabel(item)}
+            </span>
           </span>
         </span>
       </button>

@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { db } from "@/db/db";
 import type { Item, Photo } from "@/db/types";
-import { guessItemColor } from "@/features/items/guessColor";
+import { guessItemColorFamily } from "@/features/items/guessColor";
 import { itemsCountLabel, plural } from "@/features/items/itemView";
 import {
   findDuplicate,
@@ -195,7 +195,7 @@ export function BulkUpload() {
             type: "unknown",
             slot: "top",
             label,
-            color: guessItemColor(label),
+            colors: [guessItemColorFamily(label)],
             pattern: "solid",
             texture: "cotton",
             warmth: 3,
@@ -294,7 +294,7 @@ export function BulkUpload() {
       }
 
       setNotice({ kind: "success", text: `Обновлено ${updated} миниатюр!` });
-    } catch (err) {
+    } catch {
       setNotice({ kind: "error", text: "Ошибка при обновлении миниатюр." });
     } finally {
       setPhase("idle");

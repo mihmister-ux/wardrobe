@@ -4,15 +4,16 @@ import * as React from "react";
 import { Camera, ImagePlus, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { db } from "@/db/db";
-import type { Item, ItemColor, ItemStatus } from "@/db/types";
+import type { ColorFamily, Item, ItemStatus } from "@/db/types";
 import {
-  COLORS,
   PATTERNS,
   SLOTS,
   TYPES_BY_SLOT,
   TYPE_MAP,
   buildItemDefaults,
 } from "@/db/seed/references";
+import { ColorPicker } from "@/features/items/ColorPicker";
+import { combineColors, itemColorLabel } from "@/features/items/itemColors";
 import { SeasonPicker } from "@/features/items/SeasonPicker";
 import { SLOT_EMOJI } from "@/features/items/itemView";
 import { mergeSeasonRanges, type SeasonId } from "@/features/items/seasons";
@@ -54,9 +55,9 @@ async function compressImage(file: File): Promise<CompressedImage> {
 
 export interface AddItemSheetProps { open: boolean; onOpenChange: (open: boolean) => void; onSaved?: (item: Item) => void; }
 
-interface FormState { photo: CompressedImage | null; previewUrl: string | null; typeId: string | null; seasons: SeasonId[]; color: ItemColor | null; label: string; isSaving: boolean; error: string | null; }
+interface FormState { photo: CompressedImage | null; previewUrl: string | null; typeId: string | null; seasons: SeasonId[]; primary: ColorFamily | null; secondary: ColorFamily | null; label: string; isSaving: boolean; error: string | null; }
 
-const INITIAL: FormState = { photo: null, previewUrl: null, typeId: null, seasons: [], color: null, label: "", isSaving: false, error: null };
+const INITIAL: FormState = { photo: null, previewUrl: null, typeId: null, seasons: [], primary: null, secondary: null, label: "", isSaving: false, error: null };
 
 export default function AddItemSheet({ open, onOpenChange, onSaved }: AddItemSheetProps) {
   const [form, setForm] = React.useState<FormState>(INITIAL);
@@ -97,14 +98,15 @@ export default function AddItemSheet({ open, onOpenChange, onSaved }: AddItemShe
     } catch (err) { setField("error", err instanceof Error ? err.message : "Ошибка фото"); }
   };
 
-  const canSave = form.photo !== null && form.typeId !== null && form.seasons.length > 0 && form.color !== null && !form.isSaving;
+  const canSave = form.photo !== null && form.typeId !== null && form.seasons.length > 0 && form.primary !== null && !form.isSaving;
 
   const handleSave = async () => {
-    if (!canSave || !form.photo || !form.typeId || !form.color) return;
+    if (!canSave || !form.photo || !form.typeId || !form.primary) return;
     const type = TYPE_MAP[form.typeId];
     const defaults = buildItemDefaults(form.typeId);
     const range = mergeSeasonRanges(form.seasons);
     if (!type || !defaults || !range) return;
+    const colors = combineColors(form.primary, form.secondary);
     setForm((s) => ({ ...s, isSaving: true, error: null }));
     try {
       const now = Date.now();
@@ -115,8 +117,8 @@ export default function AddItemSheet({ open, onOpenChange, onSaved }: AddItemShe
 
       const item: Item = {
         id: itemId, type: defaults.type, slot: defaults.slot,
-        label: form.label.trim() || `${type.label} · ${form.color.label}`,
-        color: form.color, pattern: PATTERNS[0].id, texture: defaults.texture,
+        label: form.label.trim() || `${type.label} · ${itemColorLabel({ colors })}`,
+        colors, pattern: PATTERNS[0].id, texture: defaults.texture,
         warmth: range.warmth, tempMin: range.tempMin, tempMax: range.tempMax,
         waterResistance: defaults.waterResistance, windproof: defaults.windproof,
         formality: defaults.formality, occasions: defaults.occasions,
@@ -238,13 +240,38 @@ export default function AddItemSheet({ open, onOpenChange, onSaved }: AddItemShe
 
           <div className="space-y-2">
             <p className="text-sm font-medium">Цвет</p>
-            <div className="flex flex-wrap gap-2">
-              {COLORS.map((color) => (
-                <button key={color.family} type="button" onClick={() => setField("color", color)} className={cn("flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs transition", form.color?.family === color.family ? "border-primary bg-primary/10" : "border-border")}>
-                  <span className="size-4 rounded-full border border-border" style={{ backgroundColor: color.hex }} />{color.label}
-                </button>
-              ))}
+            <div className="grid grid-cols-2 gap-2">
+              <ColorPicker
+                id="new-item-color-primary"
+                label="Основной"
+                value={form.primary}
+                onChange={(primary) => {
+                  if (!primary) return;
+                  setForm((s) => ({
+                    ...s,
+                    primary,
+                    // Дополнительный не может совпасть с основным.
+                    secondary: s.secondary === primary ? null : s.secondary,
+                    error: null,
+                  }));
+                }}
+                disabled={form.isSaving}
+              />
+              <ColorPicker
+                id="new-item-color-secondary"
+                label="Дополнительный"
+                value={form.secondary}
+                onChange={(secondary) => setField("secondary", secondary)}
+                allowEmpty
+                emptyLabel="Нет"
+                exclude={form.primary ? [form.primary] : []}
+                disabled={form.isSaving}
+              />
             </div>
+            <p className="text-xs text-muted-foreground">
+              Второй цвет — для двухцветных вещей: полоски, контрастные рукава,
+              отделка. Его можно не выбирать.
+            </p>
           </div>
 
           <div className="space-y-2">

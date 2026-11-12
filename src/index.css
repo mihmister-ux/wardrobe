@@ -172,3 +172,37 @@ body::before {
     animation: none;
   }
 }
+
+/* «Переливание» приветствия: один проход тонкой золотой полосы по тексту
+   при загрузке Главной. Полоса — это часть градиента, а видно её только
+   через background-clip: text. Финальный кадр — обычный цвет текста,
+   поэтому fill-mode: both не оставляет следов. При «уменьшить движение»
+   правила не применяются вовсе: остаётся сплошной --foreground. */
+@media (prefers-reduced-motion: no-preference) {
+  .greeting-shimmer {
+    background-image: linear-gradient(
+      100deg,
+      var(--foreground) 0%,
+      var(--foreground) 42%,
+      #b8935a 50%,
+      var(--foreground) 58%,
+      var(--foreground) 100%
+    );
+    background-repeat: no-repeat;
+    background-size: 250% 100%;
+    background-position: 0% 0;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: greeting-shimmer 1.8s ease-in-out both;
+  }
+}
+
+@keyframes greeting-shimmer {
+  from {
+    background-position: 0% 0;
+  }
+  to {
+    background-position: 100% 0;
+  }
+}

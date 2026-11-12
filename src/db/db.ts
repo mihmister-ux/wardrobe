@@ -1,6 +1,7 @@
  import Dexie, { type Table } from 'dexie';
 import type { Item, Photo, SavedOutfit, Settings } from './types';
 import { guessItemColor, isPlaceholderColor } from '../features/items/guessColor';
+import { itemColorFamilies } from '../features/items/itemColors';
 
 export class WardrobeDB extends Dexie {
   items!: Table<Item, string>;
@@ -44,6 +45,38 @@ export class WardrobeDB extends Dexie {
       settings: 'id',
       savedOutfits: 'id, createdAt',
     });
+
+    // v4: у вещи может быть два цвета (полосатая майка, свитер с контрастными
+    // рукавами). Одноцветное поле `color` было объектом { family, hex, label } —
+    // семейство переносим в `colors` первым и само поле удаляем, чтобы не
+    // держать два источника правды. HEX и подпись не теряются: они берутся из
+    // справочника COLOR_MAP по семейству, поэтому база хранит только семейства.
+    this.version(4)
+      .stores({
+        items: 'id, type, slot, status, createdAt, lastWornAt, [status+slot], *occasions, *tags',
+        photos: 'id, itemId',
+        settings: 'id',
+        savedOutfits: 'id, createdAt',
+      })
+      .upgrade(async (tx) => {
+        const table = tx.table<Item, string>('items');
+        const items = await table.toArray();
+        let migrated = 0;
+
+        const next = items.map((item) => {
+          const { color: legacy, ...rest } = item;
+          if (legacy) migrated += 1;
+          return {
+            ...rest,
+            colors: itemColorFamilies({ colors: item.colors, color: legacy }),
+          };
+        });
+
+        if (next.length > 0) await table.bulkPut(next);
+        console.info(
+          `[wardrobe] db v4: colors перенесены у ${migrated} из ${next.length} вещей`,
+        );
+      });
   }
 }
 

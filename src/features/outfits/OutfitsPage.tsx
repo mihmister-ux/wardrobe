@@ -11,6 +11,8 @@ import { Dialog } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ItemPhoto } from "@/features/wardrobe/ItemPhoto";
 import type { Item } from "@/db/types";
+import { ColorDots } from "@/features/items/ColorDots";
+import { itemColorLabel } from "@/features/items/itemColors";
 import { itemName, slotLabel } from "@/features/items/itemView";
 import { useSavedOutfits, type ResolvedSavedOutfit } from "@/features/outfits/useSavedOutfits";
 
@@ -250,8 +252,9 @@ export default function OutfitsPage() {
                       <p className="truncate text-sm font-medium">
                         {itemName(item)}
                       </p>
-                      <p className="text-xs text-muted-foreground">
-                        {item.color.label}
+                      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <ColorDots item={item} size="sm" className="shrink-0" />
+                        <span className="truncate">{itemColorLabel(item)}</span>
                       </p>
                     </div>
                     <span className="shrink-0 rounded-full bg-background/60 px-2 py-0.5 font-mono text-[11px] text-muted-foreground">

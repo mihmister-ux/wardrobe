@@ -20,7 +20,11 @@ export interface PaletteColor {
 
 export interface PalettePiece {
   role: PieceRole;
-  color: PaletteColor;
+  /**
+   * Все цвета вещи: основной и, если он есть, дополнительный. Одноцветная
+   * вещь даёт массив из одного элемента, двухцветная — из двух.
+   */
+  colors: PaletteColor[];
 }
 
 export type HarmonyId =
@@ -119,29 +123,59 @@ const BASE_SCORE = 56;
 const MIN_SCORE = 35;
 const MAX_SCORE = 99;
 
-/** Пара «верх + низ» и пары для цельного образа: где ищем монохром. */
-function monochromePairs(roleColor: (role: PieceRole) => PaletteColor | undefined) {
+/**
+ * Пара «верх + низ» и пары для цельного образа: где ищем монохром.
+ * На вход — сами вещи: у каждой может быть до двух цветов.
+ */
+function monochromePairs(pieces: readonly PalettePiece[]) {
+  const byRole = (role: PieceRole): PalettePiece | undefined =>
+    pieces.find((piece) => piece.role === role);
   return [
-    [roleColor('top'), roleColor('bottom')],
-    [roleColor('fullbody'), roleColor('shoes')],
-    [roleColor('fullbody'), roleColor('outerwear')],
+    [byRole('top'), byRole('bottom')],
+    [byRole('fullbody'), byRole('shoes')],
+    [byRole('fullbody'), byRole('outerwear')],
   ] as const;
+}
+
+/** Пересечение цветов двух вещей: общая гамма — это уже гармония. */
+function sharedFamilies(
+  left: readonly PaletteColor[],
+  right: readonly PaletteColor[],
+): string[] {
+  const rightFamilies = new Set(right.map((color) => color.family));
+  const shared: string[] = [];
+  for (const color of left) {
+    if (rightFamilies.has(color.family) && !shared.includes(color.family)) {
+      shared.push(color.family);
+    }
+  }
+  return shared;
+}
+
+/** Общая гамма разошлась по оттенкам: «чёрный» и «графит» — это не одно и то же. */
+function isShadeSplit(
+  left: readonly PaletteColor[],
+  right: readonly PaletteColor[],
+  family: string,
+): boolean {
+  const leftHexes = left.filter((color) => color.family === family).map((color) => color.hex);
+  const rightHexes = right.filter((color) => color.family === family).map((color) => color.hex);
+  return leftHexes.some((a) => rightHexes.some((b) => hexDistance(a, b) > 10));
 }
 
 function collectBonuses(pieces: readonly PalettePiece[]): HarmonyBonus[] {
   if (pieces.length === 0) return [];
 
-  const roleColor = (role: PieceRole): PaletteColor | undefined =>
-    pieces.find((piece) => piece.role === role)?.color;
-
   const bonuses: HarmonyBonus[] = [];
 
-  // 1. Монохром: верх и низ одного семейства. Если HEX разный — это разные
-  //    оттенки одного цвета, самый «дорогой» вариант монохрома.
+  // 1. Монохром: верх и низ делят хотя бы одно семейство. Если у вещей
+  //    несколько общих цветов, достаточно одного: вещи уже перекликаются.
   let monochrome: HarmonyBonus | null = null;
-  for (const [left, right] of monochromePairs(roleColor)) {
-    if (!left || !right || left.family !== right.family) continue;
-    const isShades = hexDistance(left.hex, right.hex) > 10;
+  for (const [left, right] of monochromePairs(pieces)) {
+    if (!left || !right) continue;
+    const shared = sharedFamilies(left.colors, right.colors);
+    if (shared.length === 0) continue;
+    const isShades = shared.some((family) => isShadeSplit(left.colors, right.colors, family));
     const hit: HarmonyBonus = isShades
       ? {
           id: 'monochrome-shades',
@@ -161,8 +195,13 @@ function collectBonuses(pieces: readonly PalettePiece[]): HarmonyBonus[] {
 
   // 2. Нейтральная база: белый, чёрный, бежевый, серый или коричневый
   //    сочетаются со всем, поэтому рядом с цветом они работают опорой.
-  const neutrals = pieces.filter((piece) => isNeutralFamily(piece.color.family));
-  const accents = pieces.filter((piece) => !isNeutralFamily(piece.color.family));
+  //    Считаем по каждому цвету отдельно: у двухцветной вещи вторая половина
+  //    тоже участвует в палитре.
+  const entries = pieces.flatMap((piece) =>
+    piece.colors.map((color) => ({ role: piece.role, color })),
+  );
+  const neutrals = entries.filter((entry) => isNeutralFamily(entry.color.family));
+  const accents = entries.filter((entry) => !isNeutralFamily(entry.color.family));
 
   if (neutrals.length > 0 && accents.length > 0) {
     bonuses.push({
@@ -199,9 +238,9 @@ function collectBonuses(pieces: readonly PalettePiece[]): HarmonyBonus[] {
         points: 9,
       });
     } else {
-      const complementary = accents.some((piece, i) =>
+      const complementary = accents.some((entry, i) =>
         accents.some(
-          (other, j) => j > i && hueDistance(piece.color.family, other.color.family) === 6,
+          (other, j) => j > i && hueDistance(entry.color.family, other.color.family) === 6,
         ),
       );
       if (complementary) {
@@ -215,7 +254,7 @@ function collectBonuses(pieces: readonly PalettePiece[]): HarmonyBonus[] {
     }
 
     // 4. Слишком много акцентов: четыре разных цвета уже спорят друг с другом.
-    const distinct = new Set(accents.map((piece) => piece.color.family));
+    const distinct = new Set(accents.map((entry) => entry.color.family));
     if (distinct.size >= 4) {
       bonuses.push({
         id: 'busy',

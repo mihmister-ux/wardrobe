@@ -17,7 +17,18 @@ export interface Item {
   type: string;
   slot: Slot;
   label?: string;
-  color: ItemColor;
+  /**
+   * Цвета вещи: 1–2 семейства из справочника, основное первым. Второй цвет
+   * нужен для двухцветных вещей — полосатой майки, свитера с контрастными
+   * рукавами. HEX и подпись не дублируем: они достаются из COLOR_MAP.
+   */
+  colors: ColorFamily[];
+  /**
+   * @deprecated Одноцветное поле до схемы v4: `{ family, hex, label }`.
+   * Миграция v4 переносит его в `colors`, поэтому в живой базе его уже нет.
+   * Оставлено для чтения старых резервных копий и неполных записей.
+   */
+  color?: ItemColor;
   pattern: Pattern;
   texture: Texture;
   warmth: Warmth;
