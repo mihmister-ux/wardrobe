@@ -54,7 +54,11 @@ function newestFirst(items: readonly Item[]): Item[] {
   return [...items].sort((left, right) => right.createdAt - left.createdAt);
 }
 
-export function useHomeOutfits(temperature: number, occasion: Occasion): HomeOutfits {
+export function useHomeOutfits(
+  temperature: number,
+  occasion: Occasion,
+  temperatureKnown = true,
+): HomeOutfits {
   const [rotation, setRotation] = React.useState(0);
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [isRegenerating, setIsRegenerating] = React.useState(false);
@@ -72,9 +76,9 @@ export function useHomeOutfits(temperature: number, occasion: Occasion): HomeOut
   const outfits = React.useMemo(
     () =>
       read?.items
-        ? buildOutfits({ items: read.items, temperature, occasion })
+        ? buildOutfits({ items: read.items, temperature, occasion, temperatureKnown })
         : [],
-    [read, temperature, occasion],
+    [read, temperature, occasion, temperatureKnown],
   );
 
   // Ручной выбор важнее автоперебора: пользователь кликнул альтернативу —

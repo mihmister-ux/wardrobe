@@ -31,8 +31,9 @@ import { ColorDots } from "@/features/items/ColorDots";
 import { itemColorLabel } from "@/features/items/itemColors";
 import { formatItemRange, itemName, SLOT_EMOJI } from "@/features/items/itemView";
 import type { OutfitScore } from "@/features/home/scoreOutfit";
+import { parseTemperature, type ManualWeather } from "@/features/home/manualWeather";
 import { useHomeOutfits } from "@/features/home/useHomeOutfits";
-import { useWeather } from "@/features/home/useWeather";
+import { useWeather, type WeatherStatus } from "@/features/home/useWeather";
 import { saveOutfit } from "@/features/outfits/useSavedOutfits";
 import { formatWornDay, recordWornOutfit } from "@/features/outfits/useWornHistory";
 import { useUserName } from "@/features/settings/useUserName";
@@ -117,6 +118,13 @@ const WEATHER_ICON: Record<WeatherKind, React.ComponentType<{ className?: string
   rain: CloudRain,
   snow: Cloud,
 };
+
+/**
+ * Температура, по которой собираем образ, пока погоды нет (сервис молчит,
+ * ручной ввод ещё не сделан). Нейтральная: не «мороз» и не «жара», чтобы
+ * образ без погоды не выкидывал лишнюю верхнюю одежду.
+ */
+const NEUTRAL_TEMPERATURE = 15;
 
 function weatherHint(weather: Weather): string {
   if (weather.kind === "rain") return "Возьми зонт и непромокаемую обувь.";
@@ -231,16 +239,253 @@ function Stat({
 /*  1. Погода                                                                 */
 /* ========================================================================== */
 
-function WeatherCard({
-  weather,
-  isFallback = false,
+/** Что человек может выбрать сам вместе с температурой. */
+const MANUAL_CONDITIONS = [
+  { kind: "clear", label: "Солнечно" },
+  { kind: "cloudy", label: "Облачно" },
+  { kind: "rain", label: "Дождь" },
+] as const;
+
+const MANUAL_TIME_FORMATTER = new Intl.DateTimeFormat("ru-RU", {
+  day: "numeric",
+  month: "long",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+/** «+15°» / «−8°»: плюс показываем явно, минус — типографским знаком. */
+function formatTemperature(value: number): string {
+  if (value === 0) return "0°";
+  return value > 0 ? `+${value}°` : `−${Math.abs(value)}°`;
+}
+
+/** Строка «Ваш город … Изменить» — общая для всех состояний карточки. */
+function CityLine({
+  hasCity,
+  label,
+  badge,
 }: {
-  weather: Weather;
-  /** Данных нет: вместо технической ошибки показываем короткую подпись. */
-  isFallback?: boolean;
+  hasCity: boolean;
+  label: string;
+  badge?: React.ReactNode;
 }) {
+  return (
+    <div className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5 text-xs font-medium text-muted-foreground">
+      <MapPin className="size-3.5 shrink-0" />
+      <span className="shrink-0">Ваш город</span>
+      <span className="truncate text-foreground">{hasCity ? label : "не выбран"}</span>
+      <Link
+        to="/profile"
+        className="ml-1 shrink-0 text-[11px] font-medium text-primary hover:underline"
+      >
+        {hasCity ? "Изменить" : "Указать город"}
+      </Link>
+      {badge}
+    </div>
+  );
+}
+
+/**
+ * Ручной ввод погоды: температура + необязательная подпись.
+ * Форма одна на два случая — «сервис молчит» и «правлю ручное значение».
+ */
+function ManualWeatherForm({
+  defaultTemp,
+  defaultKind,
+  showCityHint,
+  onSave,
+  onRetry,
+}: {
+  defaultTemp?: number;
+  defaultKind?: WeatherKind;
+  /** Подсказать про профиль, когда город не выбран. */
+  showCityHint: boolean;
+  onSave: (temp: number, kind: WeatherKind, condition: string) => void;
+  onRetry: () => void;
+}) {
+  const [value, setValue] = React.useState(() =>
+    defaultTemp != null && defaultTemp > 0 ? `+${defaultTemp}` : (defaultTemp != null ? String(defaultTemp) : ""),
+  );
+  const [kind, setKind] = React.useState<WeatherKind>(defaultKind ?? "cloudy");
+  const [error, setError] = React.useState<string | null>(null);
+
+  const submit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const parsed = parseTemperature(value);
+    if (parsed === null) {
+      setError("Введите температуру числом: +15, 0 или -8");
+      return;
+    }
+    setError(null);
+    const label =
+      MANUAL_CONDITIONS.find((item) => item.kind === kind)?.label ?? "Вручную";
+    onSave(parsed, kind, label);
+  };
+
+  return (
+    <form onSubmit={submit} className="space-y-3">
+      <div className="space-y-1.5">
+        <label
+          htmlFor="manual-weather-temp"
+          className="block text-xs font-medium text-muted-foreground"
+        >
+          Температура, °C
+        </label>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            id="manual-weather-temp"
+            value={value}
+            onChange={(event) => {
+              setValue(event.target.value);
+              setError(null);
+            }}
+            placeholder="+15"
+            inputMode="text"
+            autoComplete="off"
+            aria-invalid={error !== null}
+            className="h-10 w-24 rounded-xl border border-border bg-transparent px-3 text-sm tabular-nums outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+          />
+          <Button type="submit" className="rounded-xl">
+            Сохранить
+          </Button>
+          <Button type="button" variant="outline" className="rounded-xl" onClick={onRetry}>
+            Проверить снова
+          </Button>
+        </div>
+      </div>
+
+      <div role="group" aria-label="Погода" className="flex flex-wrap gap-1.5">
+        {MANUAL_CONDITIONS.map((item) => {
+          const isActive = item.kind === kind;
+          return (
+            <button
+              key={item.kind}
+              type="button"
+              aria-pressed={isActive}
+              onClick={() => setKind(item.kind)}
+              className={cn(
+                "inline-flex min-h-9 items-center rounded-full border px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                isActive
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground",
+              )}
+            >
+              {item.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {error ? (
+        <p role="alert" className="text-xs text-destructive">
+          {error}
+        </p>
+      ) : null}
+
+      {showCityHint ? (
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          Или укажите город — тогда погода будет подтягиваться сама.{" "}
+          <Link to="/profile" className="font-medium text-primary hover:underline">
+            Профиль
+          </Link>
+        </p>
+      ) : null}
+    </form>
+  );
+}
+
+/** Компактная «пилюля»-кнопка для подвала карточки. */
+const CARD_ACTION_CLASS =
+  "inline-flex min-h-9 items-center rounded-full border border-border bg-background px-3 text-xs font-medium text-foreground transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+
+function WeatherCard({
+  status,
+  weather,
+  error,
+  hasCity,
+  city,
+  isLoading,
+  manual,
+  onSaveManual,
+  onRefetch,
+}: {
+  status: WeatherStatus;
+  weather: Weather | null;
+  error: string | null;
+  hasCity: boolean;
+  /** Город из настроек: показываем его, пока погода не загрузилась. */
+  city: string;
+  isLoading: boolean;
+  manual: ManualWeather | null;
+  onSaveManual: (temp: number, kind: WeatherKind, condition: string) => void;
+  onRefetch: () => void;
+}) {
+  const [isEditing, setIsEditing] = React.useState(false);
+
+  if (isLoading) {
+    return (
+      <section
+        aria-label="Погода"
+        aria-busy="true"
+        className="overflow-hidden rounded-3xl border border-border/60 bg-card shadow-sm"
+      >
+        <div className="flex items-start justify-between gap-4 p-4">
+          <div className="min-w-0 space-y-2">
+            <CityLine hasCity={hasCity} label={city} />
+            <div className="h-9 w-28 animate-pulse rounded-lg bg-muted" />
+            <div className="h-3 w-40 animate-pulse rounded bg-muted" />
+          </div>
+          <div className="size-14 shrink-0 animate-pulse rounded-2xl bg-muted" />
+        </div>
+        <div className="border-t border-border/60 bg-muted/40 px-4 py-2.5 text-xs text-muted-foreground">
+          Обновляем погоду…
+        </div>
+      </section>
+    );
+  }
+
+  /* --- Погоды нет: честно говорим об этом и предлагаем ручной ввод --- */
+  if (status === "unavailable" || weather === null) {
+    return (
+      <section
+        aria-label="Погода"
+        className="overflow-hidden rounded-3xl border border-border/60 bg-card shadow-sm"
+      >
+        <div className="flex items-start justify-between gap-4 p-4">
+          <div className="min-w-0 space-y-1.5">
+            <CityLine hasCity={hasCity} label={city} />
+            <p className="font-serif text-xl font-semibold leading-tight">
+              {hasCity ? "Не удалось обновить погоду" : "Укажите город"}
+            </p>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              {hasCity
+                ? "Сервис погоды не ответил. Введите температуру — образ дня соберётся под неё."
+                : "Погода считается по городу. Выберите город или введите температуру вручную."}
+            </p>
+            {error ? (
+              <p className="font-mono text-[11px] leading-snug text-muted-foreground/80">
+                {error}
+              </p>
+            ) : null}
+          </div>
+          <div className="grid size-14 shrink-0 place-items-center rounded-2xl bg-muted text-muted-foreground">
+            <Cloud className="size-7" />
+          </div>
+        </div>
+
+        <div className="border-t border-border/60 bg-muted/40 px-4 py-3">
+          <ManualWeatherForm
+            showCityHint={!hasCity}
+            onSave={onSaveManual}
+            onRetry={onRefetch}
+          />
+        </div>
+      </section>
+    );
+  }
+
   const Icon = WEATHER_ICON[weather.kind];
-  const temp = weather.temp > 0 ? `+${weather.temp}` : String(weather.temp);
+  const isManual = status === "manual";
 
   return (
     <section
@@ -249,43 +494,82 @@ function WeatherCard({
     >
       <div className="flex items-start justify-between gap-4 p-4">
         <div className="min-w-0 space-y-1">
-          <div className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5 text-xs font-medium text-muted-foreground">
-            <MapPin className="size-3.5 shrink-0" />
-            <span className="shrink-0">Ваш город</span>
-            <span className="truncate text-foreground">{weather.city}</span>
-            <Link
-              to="/profile"
-              className="ml-1 shrink-0 text-[11px] font-medium text-primary hover:underline"
-            >
-              Изменить
-            </Link>
-          </div>
+          <CityLine
+            hasCity={hasCity}
+            label={weather.city}
+            badge={
+              isManual ? (
+                <span className="ml-1 shrink-0 rounded-full border border-[#d9c9a3] bg-[#f3ecd9] px-1.5 py-0.5 text-[10px] font-medium text-[#6b5a2e] dark:border-border dark:bg-muted dark:text-muted-foreground">
+                  ручной ввод
+                </span>
+              ) : null
+            }
+          />
           <div className="flex flex-wrap items-baseline gap-2">
             <span className="font-mono text-4xl font-semibold leading-none tracking-tight tabular-nums">
-              {temp}°
+              {formatTemperature(weather.temp)}
             </span>
             <span className="text-sm text-muted-foreground">{weather.condition}</span>
           </div>
-          <p className="font-mono text-xs tabular-nums text-muted-foreground">
-            ощущается как {weather.feelsLike}° · {weather.low}…{weather.high}°
-          </p>
+          {isManual ? (
+            <p className="font-mono text-xs tabular-nums text-muted-foreground">
+              {manual
+                ? `введено ${MANUAL_TIME_FORMATTER.format(new Date(manual.savedAt))}`
+                : "введено вручную"}
+            </p>
+          ) : (
+            <p className="font-mono text-xs tabular-nums text-muted-foreground">
+              ощущается как {weather.feelsLike}° · {weather.low}…{weather.high}°
+            </p>
+          )}
         </div>
         <div className="grid size-14 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary">
           <Icon className="size-7" />
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-px border-t border-border/60 bg-border/40">
-        <Stat icon={Wind} label="Ветер" value={`${weather.wind} м/с`} />
-        <Stat icon={Droplets} label="Влажность" value={`${weather.humidity}%`} />
-      </div>
+      {/* Ветер и влажность есть только у настоящей погоды. */}
+      {isManual ? null : (
+        <div className="grid grid-cols-2 gap-px border-t border-border/60 bg-border/40">
+          <Stat icon={Wind} label="Ветер" value={`${weather.wind} м/с`} />
+          <Stat icon={Droplets} label="Влажность" value={`${weather.humidity}%`} />
+        </div>
+      )}
 
-      <div className="space-y-1 border-t border-border/60 bg-muted/40 px-4 py-2.5 text-xs text-muted-foreground">
+      <div className="space-y-2 border-t border-border/60 bg-muted/40 px-4 py-2.5 text-xs text-muted-foreground">
         <p>{weatherHint(weather)}</p>
-        {isFallback ? (
-          <p className="font-mono text-[11px] text-[#6b6458] dark:text-muted-foreground">
-            Не удалось обновить погоду
-          </p>
+
+        {isManual ? (
+          isEditing ? (
+            <div className="pt-1">
+              <ManualWeatherForm
+                defaultTemp={weather.temp}
+                defaultKind={weather.kind}
+                showCityHint={false}
+                onSave={(temp, kind, condition) => {
+                  onSaveManual(temp, kind, condition);
+                  setIsEditing(false);
+                }}
+                onRetry={() => {
+                  setIsEditing(false);
+                  onRefetch();
+                }}
+              />
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2 pt-0.5">
+              <button
+                type="button"
+                className={CARD_ACTION_CLASS}
+                onClick={() => setIsEditing(true)}
+              >
+                Изменить
+              </button>
+              <button type="button" className={CARD_ACTION_CLASS} onClick={onRefetch}>
+                Обновить с сервера
+              </button>
+            </div>
+          )
         ) : null}
       </div>
     </section>
@@ -362,6 +646,8 @@ function SituationPicker({
 function OutfitOfTheDay({
   outfit,
   situation,
+  hint = "Собран под текущую погоду",
+  weatherKnown = true,
   onSave,
   onRegenerate,
   isRegenerating = false,
@@ -369,6 +655,10 @@ function OutfitOfTheDay({
   outfit: Outfit;
   /** Подпись выбранной ситуации — в пояснении к оценке. */
   situation: string;
+  /** Подпись под заголовком «Образ дня». */
+  hint?: string;
+  /** Известна ли погода: если нет, не выдаём оценку «по погоде» за правду. */
+  weatherKnown?: boolean;
   /** Сохранить в «Образы»; вернёт true, если записалось (нет дубля). */
   onSave?: () => Promise<boolean> | void;
   onRegenerate?: () => void;
@@ -390,7 +680,41 @@ function OutfitOfTheDay({
 
   return (
     <section className="space-y-3">
-      <SectionHeader icon={Sparkles} title="Образ дня" hint="Собран под текущую погоду" />
+      <SectionHeader
+        icon={Sparkles}
+        title="Образ дня"
+        hint={hint}
+        action={
+          onRegenerate ? (
+            <div className="flex shrink-0 items-center">
+              {/* Десктоп: текстом — иначе непонятно, что делает ↻. */}
+              <Button
+                type="button"
+                onClick={onRegenerate}
+                disabled={isRegenerating}
+                title="Предложить другой образ"
+                className="hidden gap-2 rounded-full bg-primary px-5 py-2.5 text-primary-foreground hover:bg-primary/90 sm:inline-flex"
+              >
+                <RefreshCw className={cn("size-4", isRegenerating && "animate-spin")} />
+                Обновить образ
+              </Button>
+              {/* Узкий экран: места под текст нет — круглая, но с подсказкой. */}
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={onRegenerate}
+                disabled={isRegenerating}
+                title="Обновить образ"
+                aria-label="Обновить образ"
+                className="rounded-full sm:hidden"
+              >
+                <RefreshCw className={cn("size-4", isRegenerating && "animate-spin")} />
+              </Button>
+            </div>
+          ) : null
+        }
+      />
 
       <article className="overflow-hidden rounded-3xl border border-border/60 bg-card shadow-[0_24px_60px_-34px_rgba(15,23,42,0.5)]">
         <div
@@ -418,7 +742,11 @@ function OutfitOfTheDay({
           <div className="absolute right-3 top-3">
             <ScoreRing
               value={outfit.score}
-              ariaLabel={`Оценка образа ${outfit.score}%: цвет ${parts.color}, погода ${parts.temperature} из 10, ситуация ${parts.formality} из 5`}
+              ariaLabel={
+                weatherKnown
+                  ? `Оценка образа ${outfit.score}%: цвет ${parts.color}, погода ${parts.temperature} из 10, ситуация ${parts.formality} из 5`
+                  : `Оценка образа ${outfit.score}%: цвет ${parts.color}, ситуация ${parts.formality} из 5`
+              }
             />
           </div>
 
@@ -445,7 +773,11 @@ function OutfitOfTheDay({
           <div className="space-y-1">
             <div
               className="flex flex-wrap items-center gap-1.5 text-xs"
-              title="Процент = сочетаемость цвета + до 10 за погоду + до 5 за уместность"
+              title={
+                weatherKnown
+                  ? "Процент = сочетаемость цвета + до 10 за погоду + до 5 за уместность"
+                  : "Процент = сочетаемость цвета + до 5 за уместность"
+              }
             >
               <span className="font-mono font-semibold tabular-nums text-foreground">
                 Оценка {outfit.score}%
@@ -453,16 +785,23 @@ function OutfitOfTheDay({
               <span className="rounded-full border border-border/50 bg-card px-2 py-0.5 font-mono text-muted-foreground">
                 цвет {parts.color}
               </span>
-              <span className="rounded-full border border-border/50 bg-card px-2 py-0.5 font-mono text-muted-foreground">
-                погода +{parts.temperature}/10
-              </span>
+              {weatherKnown ? (
+                <span className="rounded-full border border-border/50 bg-card px-2 py-0.5 font-mono text-muted-foreground">
+                  погода +{parts.temperature}/10
+                </span>
+              ) : (
+                <span className="rounded-full border border-dashed border-border/60 bg-card px-2 py-0.5 font-mono text-muted-foreground">
+                  погода не учтена
+                </span>
+              )}
               <span className="rounded-full border border-border/50 bg-card px-2 py-0.5 font-mono text-muted-foreground">
                 ситуация +{parts.formality}/5
               </span>
             </div>
             <p className="text-xs leading-snug text-muted-foreground">
-              Процент складывается из трёх: гармония цвета, уместность по погоде
-              и формальность для ситуации «{situation}».
+              {weatherKnown
+                ? `Процент складывается из трёх: гармония цвета, уместность по погоде и формальность для ситуации «${situation}».`
+                : `Процент складывается из гармонии цвета и формальности для ситуации «${situation}». Погоды нет — задайте её в карточке выше, и образ соберётся под неё.`}
             </p>
           </div>
 
@@ -512,19 +851,10 @@ function OutfitOfTheDay({
             ))}
           </ul>
 
-          <div className="flex items-center gap-2 pt-1">
-            <Button className="flex-1 rounded-full" onClick={handleWear}>
+          {/* ↻ живёт в шапке секции: он виден без прокрутки. Здесь — только «Носить». */}
+          <div className="pt-1">
+            <Button className="w-full rounded-full" onClick={handleWear}>
               Носить сегодня
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="rounded-full"
-              aria-label="Предложить другой образ"
-              onClick={onRegenerate}
-              disabled={isRegenerating}
-            >
-              <RefreshCw className={cn("size-4", isRegenerating && "animate-spin")} />
             </Button>
           </div>
         </div>
@@ -731,8 +1061,24 @@ export interface HomePageProps {
 
 export default function HomePage({ onAddItem }: HomePageProps) {
   const { name } = useUserName();
-  const { weather, isFallback: isWeatherFallback } = useWeather();
+  const {
+    weather,
+    status: weatherStatus,
+    isLoading: isWeatherLoading,
+    error: weatherError,
+    hasCity,
+    city: settingsCity,
+    manual: manualWeather,
+    saveManual,
+    refetch: refetchWeather,
+  } = useWeather();
   const [occasion, setOccasion] = React.useState<Occasion>(() => defaultOccasion());
+
+  // Погоды может не быть вовсе: тогда образ собираем по нейтральной температуре,
+  // а в интерфейсе честно пишем, что она не учтена.
+  const weatherKnown = weather !== null;
+  const isManualWeather = weatherStatus === "manual";
+
   const {
     outfitOfTheDay,
     alternatives,
@@ -743,7 +1089,13 @@ export default function HomePage({ onAddItem }: HomePageProps) {
     isRegenerating,
     error: outfitsError,
     regenerate,
-  } = useHomeOutfits(weather.temp, occasion);
+  } = useHomeOutfits(weather?.temp ?? NEUTRAL_TEMPERATURE, occasion, weatherKnown);
+
+  const outfitHint = !weatherKnown
+    ? "Погода не задана — образ собран без неё"
+    : isManualWeather
+      ? "Собран под температуру, введённую вручную"
+      : "Собран под текущую погоду";
 
   const userName = name?.trim() || "гость";
   const userInitial = userName.charAt(0).toUpperCase();
@@ -770,7 +1122,17 @@ export default function HomePage({ onAddItem }: HomePageProps) {
         {/* Верхняя полоса: погода + ситуация. */}
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] lg:items-start">
           <Reveal>
-            <WeatherCard weather={weather} isFallback={isWeatherFallback} />
+            <WeatherCard
+              status={weatherStatus}
+              weather={weather}
+              error={weatherError}
+              hasCity={hasCity}
+              city={settingsCity}
+              isLoading={isWeatherLoading}
+              manual={manualWeather}
+              onSaveManual={saveManual}
+              onRefetch={refetchWeather}
+            />
           </Reveal>
 
           <Reveal delay={0.03}>
@@ -797,6 +1159,8 @@ export default function HomePage({ onAddItem }: HomePageProps) {
                 key={outfitOfTheDay.id}
                 outfit={outfitOfTheDay}
                 situation={OCCASION_MAP[occasion].label}
+                hint={outfitHint}
+                weatherKnown={weatherKnown}
                 isRegenerating={isRegenerating}
                 onRegenerate={regenerate}
                 onSave={() =>

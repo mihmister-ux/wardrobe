@@ -77,6 +77,11 @@ export interface BuildOutfitsOptions {
   temperature: number;
   /** Куда собираемся: задаёт целевую формальность в оценке. */
   occasion: Occasion;
+  /**
+   * Известна ли температура. Когда нет — не пишем её в теги образа:
+   * иначе на карточке появилось бы «15°», которого на самом деле никто не знает.
+   */
+  temperatureKnown?: boolean;
   limit?: number;
 }
 
@@ -84,6 +89,7 @@ export function buildOutfits({
   items,
   temperature,
   occasion,
+  temperatureKnown = true,
   limit = MAX_VARIANTS,
 }: BuildOutfitsOptions): UiOutfit[] {
   const available = items.filter((item) => item.status === "available");
@@ -160,7 +166,9 @@ export function buildOutfits({
       ].slice(0, 4),
       score: score.total,
       scoreParts: score,
-      tags: [seasonLabel(temperature), `${tempText(temperature)}°`],
+      tags: temperatureKnown
+        ? [seasonLabel(temperature), `${tempText(temperature)}°`]
+        : ["Погода не задана"],
       items: picked.map((item) => ({
         id: item.id,
         name: itemName(item),

@@ -2,31 +2,15 @@
 
 import * as React from "react";
 import type { Weather, WeatherKind } from "@/features/home/HomePage";
+import {
+  clearManualWeather,
+  manualMatchesCity,
+  readManualWeather,
+  writeManualWeather,
+  type ManualWeather,
+} from "@/features/home/manualWeather";
+import { toast } from "@/components/ui/toast";
 import { useSettings } from "@/features/settings/useSettings";
-
-/* ========================================================================== */
-/*  Заглушка: показывается, если город не задан, нет геолокации или API молчит */
-/* ========================================================================== */
-
-const FALLBACK_WEATHER: Weather = {
-  city: "Москва",
-  temp: 7,
-  feelsLike: 4,
-  high: 9,
-  low: 3,
-  kind: "cloudy",
-  condition: "Облачно",
-  wind: 4,
-  humidity: 68,
-};
-
-const GEO_TIMEOUT_MS = 8000;
-const FETCH_TIMEOUT_MS = 8000;
-
-interface Coords {
-  latitude: number;
-  longitude: number;
-}
 
 /* ========================================================================== */
 /*  WMO weather code → иконка и подпись                                       */
@@ -90,6 +74,14 @@ function describeCode(code: number): { kind: WeatherKind; condition: string } {
 /* ========================================================================== */
 /*  Геолокация                                                                */
 /* ========================================================================== */
+
+const GEO_TIMEOUT_MS = 8000;
+const FETCH_TIMEOUT_MS = 8000;
+
+interface Coords {
+  latitude: number;
+  longitude: number;
+}
 
 /**
  * Координаты пользователя или null, если браузер не дал доступ.
@@ -264,30 +256,81 @@ async function fetchCityName(
 /*  Хук                                                                       */
 /* ========================================================================== */
 
-export type WeatherSource = "manual" | "geo" | "fallback";
+export type WeatherStatus = "real" | "manual" | "unavailable";
 
 export interface UseWeatherResult {
-  /** Всегда валидный объект: реальные данные или заглушка «Москва +7°». */
-  weather: Weather;
+  /**
+   * Погода или null, когда данных нет вообще: в этом случае экран честно
+   * говорит «не удалось», а не показывает заглушку как настоящую погоду.
+   */
+  weather: Weather | null;
+  /** real — с сервера, manual — введено вручную, unavailable — ничего. */
+  status: WeatherStatus;
   isLoading: boolean;
-  isFallback: boolean;
-  /** Откуда взялась погода: свой город, геолокация или заглушка. */
-  source: WeatherSource;
   error: string | null;
+  /** Выбран ли город в настройках (иначе — геолокация). */
+  hasCity: boolean;
+  /** Город из настроек, без пробелов; пустая строка — не выбран. */
+  city: string;
+  /** Сохранённое вручную значение (для текущего города), если есть. */
+  manual: ManualWeather | null;
+  saveManual: (temp: number, kind: WeatherKind, condition: string) => void;
   refetch: () => void;
 }
 
-export function useWeather(): UseWeatherResult {
-  const { city: manualCity, isLoading: isSettingsLoading } = useSettings();
+/** Ручное значение → обычный объект погоды (для карточки и образа дня). */
+function weatherFromManual(value: ManualWeather, city: string): Weather {
+  return {
+    city: value.city || city || "Ручной ввод",
+    temp: value.temp,
+    feelsLike: value.temp,
+    high: value.temp,
+    low: value.temp,
+    kind: value.kind,
+    condition: value.condition,
+    wind: 0,
+    humidity: 0,
+  };
+}
 
-  const [weather, setWeather] = React.useState<Weather>(FALLBACK_WEATHER);
+export function useWeather(): UseWeatherResult {
+  const { city: settingsCity, isLoading: isSettingsLoading } = useSettings();
+
+  const [weather, setWeather] = React.useState<Weather | null>(null);
+  const [status, setStatus] = React.useState<WeatherStatus>("unavailable");
+  const [manual, setManual] = React.useState<ManualWeather | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
-  const [isFallback, setIsFallback] = React.useState(true);
-  const [source, setSource] = React.useState<WeatherSource>("fallback");
   const [error, setError] = React.useState<string | null>(null);
   const [attempt, setAttempt] = React.useState(0);
 
   const refetch = React.useCallback(() => setAttempt((value) => value + 1), []);
+  const hasCity = settingsCity.length > 0;
+
+  /** Сохранённое значение, но только если оно относится к текущему городу. */
+  const usableManual = React.useCallback(() => {
+    const stored = readManualWeather();
+    return stored && manualMatchesCity(stored, settingsCity) ? stored : null;
+  }, [settingsCity]);
+
+  const saveManual = React.useCallback(
+    (temp: number, kind: WeatherKind, condition: string) => {
+      const value: ManualWeather = {
+        mode: "manual",
+        temp: Math.round(temp),
+        kind,
+        condition,
+        city: settingsCity,
+        savedAt: Date.now(),
+      };
+      writeManualWeather(value);
+      setManual(value);
+      setWeather(weatherFromManual(value, settingsCity));
+      setStatus("manual");
+      setError(null);
+      setIsLoading(false);
+    },
+    [settingsCity],
+  );
 
   React.useEffect(() => {
     // Ждём настройки: иначе на долю секунды покажем погоду не того города.
@@ -297,14 +340,19 @@ export function useWeather(): UseWeatherResult {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
-    const fail = (message: string) => {
+    /** Реальных данных нет: показываем ручной ввод, если он есть для этого города. */
+    const noRealWeather = (message: string | null) => {
       if (cancelled) return;
-      setWeather({
-        ...FALLBACK_WEATHER,
-        ...(manualCity ? { city: manualCity } : {}),
-      });
-      setIsFallback(true);
-      setSource("fallback");
+      const stored = usableManual();
+      if (stored) {
+        setManual(stored);
+        setWeather(weatherFromManual(stored, settingsCity));
+        setStatus("manual");
+      } else {
+        setManual(null);
+        setWeather(null);
+        setStatus("unavailable");
+      }
       setError(message);
       setIsLoading(false);
     };
@@ -312,6 +360,7 @@ export function useWeather(): UseWeatherResult {
     void (async () => {
       setIsLoading(true);
       setError(null);
+      setManual(usableManual());
       // Один таймаут на геокодинг и на прогноз: город не должен «висеть».
       timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
@@ -319,12 +368,12 @@ export function useWeather(): UseWeatherResult {
         let coords: Coords;
         let label: string | null = null;
 
-        if (manualCity) {
-          const place = await geocodeCity(manualCity, controller.signal);
+        if (settingsCity) {
+          const place = await geocodeCity(settingsCity, controller.signal);
           if (cancelled) return;
           if (!place) {
-            fail(
-              `Не нашли город «${manualCity}». Проверьте название в профиле.`,
+            noRealWeather(
+              `Не нашли город «${settingsCity}». Проверьте название в профиле.`,
             );
             return;
           }
@@ -334,7 +383,7 @@ export function useWeather(): UseWeatherResult {
           const geo = await getCoords();
           if (cancelled) return;
           if (!geo) {
-            fail(
+            noRealWeather(
               "Геолокация недоступна. Укажите город в профиле — погода будет точнее.",
             );
             return;
@@ -345,18 +394,24 @@ export function useWeather(): UseWeatherResult {
         const data = await fetchWeather(coords, controller.signal);
         if (cancelled) return;
 
-        if (manualCity) {
-          setWeather({ ...data, city: label ?? manualCity });
-          setSource("manual");
+        if (settingsCity) {
+          setWeather({ ...data, city: label ?? settingsCity });
         } else {
           const city = await fetchCityName(coords, controller.signal);
           if (cancelled) return;
           setWeather(city ? { ...data, city } : data);
-          setSource("geo");
         }
 
-        setIsFallback(false);
+        setStatus("real");
         setError(null);
+
+        // Реальные данные важнее ручных: затираем ручной ввод (только «свой»).
+        const stored = usableManual();
+        if (stored) {
+          clearManualWeather();
+          setManual(null);
+          toast("Погода пришла с сервера — ручной ввод больше не нужен");
+        }
       } catch (err) {
         if (cancelled) return;
         const message = controller.signal.aborted
@@ -366,7 +421,7 @@ export function useWeather(): UseWeatherResult {
             : err instanceof Error
               ? err.message
               : String(err);
-        fail(message);
+        noRealWeather(message);
       } finally {
         if (timer) clearTimeout(timer);
         if (!cancelled) setIsLoading(false);
@@ -378,7 +433,17 @@ export function useWeather(): UseWeatherResult {
       controller.abort();
       if (timer) clearTimeout(timer);
     };
-  }, [attempt, isSettingsLoading, manualCity]);
+  }, [attempt, isSettingsLoading, settingsCity, usableManual]);
 
-  return { weather, isLoading, isFallback, source, error, refetch };
+  return {
+    weather,
+    status,
+    isLoading,
+    error,
+    hasCity,
+    city: settingsCity,
+    manual,
+    saveManual,
+    refetch,
+  };
 }
