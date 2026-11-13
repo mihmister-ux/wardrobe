@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Loader2, X } from "lucide-react";
+import { Check, Loader2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -238,16 +238,33 @@ export function EditItemSheet({ item, onClose }: EditItemSheetProps) {
               {itemName(item)} · {SLOT_MAP[form.slot].label}
             </p>
           </div>
-          <Button
-            variant="outline"
-            size="icon"
-            className="shrink-0 rounded-full"
-            onClick={onClose}
-            disabled={form.isSaving}
-            aria-label="Закрыть"
-          >
-            <X className="size-4" />
-          </Button>
+          <div className="flex shrink-0 items-center gap-2">
+            {/* На мобильном дока нет места нижним кнопкам — дублируем сохранение в шапку. */}
+            <Button
+              type="button"
+              size="icon"
+              className="rounded-full bg-primary text-primary-foreground hover:bg-primary/90 md:hidden"
+              onClick={() => void handleSave()}
+              disabled={!canSave}
+              aria-label="Сохранить"
+            >
+              {form.isSaving ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Check className="size-4" />
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="rounded-full"
+              onClick={onClose}
+              disabled={form.isSaving}
+              aria-label="Закрыть"
+            >
+              <X className="size-4" />
+            </Button>
+          </div>
         </div>
 
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-4">
@@ -466,7 +483,7 @@ export function EditItemSheet({ item, onClose }: EditItemSheetProps) {
             </p>
           ) : null}
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="hidden grid-cols-2 gap-2 md:grid">
             <Button
               variant="outline"
               className="rounded-full"
