@@ -1,75 +1,71 @@
-# React + TypeScript + Vite
+# 👗 Wardrobe — умный гардероб
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+PWA-приложение, которое подбирает **образ дня под погоду**, хранит все ваши вещи (71 шт. и больше) и ведёт статистику носки — что носили, что лежит без дела, какие цвета сочетаются.
 
-Currently, two official plugins are available:
+🔗 **Демо:** [mihmister-ux.github.io/wardrobe](https://mihmister-ux.github.io/wardrobe/)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## ✨ Что умеет
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- 🌦 **Образ дня по погоде** — тянет реальную погоду (Open-Meteo) по вашему городу и собирает образ под температуру. Если сервис молчит — можно ввести температуру вручную.
+- 🧥 **Каталог вещей** — вся одежда с фото, цветом, сезоном, тканью и уместностью, с поиском и фильтрами.
+- 📊 **Статистика «что носили»** — журнал ношения и счётчик топ-вещей.
+- 💾 **PWA / офлайн** — ставится на домашний экран и работает без сети (service worker + манифест).
+- 🎨 **«Тихая роскошь»** — шрифты Playfair Display + IBM Plex Mono, кремовая палитра.
+- 📱 **Адаптив** — удобно и на десктопе, и на мобильном (нижний док, шторки).
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## 🛠 Стек
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+| Слой            | Технологии                                        |
+| --------------- | ------------------------------------------------- |
+| Язык            | TypeScript, React 19                              |
+| Сборка          | Vite 8                                            |
+| Стили           | Tailwind CSS 4                                    |
+| Данные          | Dexie / IndexedDB (локально, в браузере)          |
+| Погода          | Open-Meteo (бесплатный, без ключа)                |
+| PWA             | vite-plugin-pwa (service worker, манифест, иконки) |
+| Хостинг         | GitHub Pages (автодеплой при push в `main`)       |
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+---
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## 🚀 Как запустить
 
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+Приложение откроется на `http://localhost:5173/` (при кастомном `base` — на `http://localhost:5173/wardrobe/`).
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### Полезные команды
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```bash
+npm run build    # сборка для продакшена (tsc + vite build) в /dist
+npm run preview  # локальный просмотр собранной версии
+npm run lint     # ESLint
 ```
+
+---
+
+## 📁 Структура (кратко)
+
+```text
+src/
+├── features/
+│   ├── home/        # образ дня, погода, альтернативы
+│   ├── wardrobe/    # каталог вещей, поиск, фильтры
+│   ├── outfits/     # сохранённые образы, статистика носки
+│   ├── items/       # цвета, сезоны, фото
+│   └── settings/    # профиль, город, тема
+├── db/              # Dexie-схема и справочники
+└── components/      # UI-кит и layout
+```
+
+---
+
+## ☁️ Публикация
+
+При пуше в ветку `main` GitHub Actions собирает проект и выкладывает его на GitHub Pages (workflow в `.github/workflows/deploy.yml`). В `vite.config.ts` задан `base: '/wardrobe/'`.
