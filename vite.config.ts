@@ -5,6 +5,9 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  // GitHub Pages раздаёт проект по адресу username.github.io/wardrobe/,
+  // а не с корня домена — иначе ассеты и роутер ищутся в /assets/… и 404.
+  base: '/wardrobe/',
   plugins: [
     react(),
     tailwindcss(),
